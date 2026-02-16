@@ -1,11 +1,13 @@
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Tabs } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Tabs } from 'expo-router';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { runMigrations } from '../src/db/migrations';
 import { useI18n } from '../src/i18n/useI18n';
 import { colors, gradients, radius, spacing, typography } from '../src/theme/tokens';
+
+const BOOT_TIMEOUT_MS = 12000;
 
 export default function RootLayout() {
   const { t } = useI18n();
@@ -18,7 +20,7 @@ export default function RootLayout() {
       await Promise.race([
         runMigrations(),
         new Promise<never>((_, reject) => {
-          setTimeout(() => reject(new Error('Initialization timed out. Please retry.')), 12000);
+          setTimeout(() => reject(new Error('Initialization timed out. Please retry.')), BOOT_TIMEOUT_MS);
         })
       ]);
       setIsReady(true);
@@ -34,9 +36,10 @@ export default function RootLayout() {
   if (!isReady && !errorMessage) {
     return (
       <LinearGradient colors={gradients.screen} style={styles.bootScreen}>
-        <ActivityIndicator color={colors.sea500} size="large" />
+        <ActivityIndicator color={colors.textTertiary} size="large" />
         <Text style={styles.bootTitle}>{t('init_preparing')}</Text>
         <Text style={styles.bootSubtitle}>{t('init_subtitle')}</Text>
+        <Text style={styles.versionText}>VERSION 1.0.2</Text>
       </LinearGradient>
     );
   }
@@ -58,85 +61,99 @@ export default function RootLayout() {
       initialRouteName="compare"
       screenOptions={({ route }) => ({
         headerShown: false,
-        tabBarActiveTintColor: colors.ink900,
-        tabBarInactiveTintColor: colors.slate500,
-        tabBarStyle: {
-          backgroundColor: colors.white,
-          borderTopWidth: 0,
-          height: 74,
-          paddingBottom: 10,
-          paddingTop: 8
-        },
-        tabBarLabelStyle: {
-          fontFamily: typography.body,
-          fontWeight: '600',
-          fontSize: 12
-        },
-        tabBarIcon: ({ color, focused, size }) => {
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.textTertiary,
+        tabBarStyle: styles.tabBar,
+        tabBarLabelStyle: styles.tabLabel,
+        tabBarIcon: ({ color, focused }) => {
           const iconByRoute: Record<string, keyof typeof MaterialCommunityIcons.glyphMap> = {
-            capture: focused ? 'plus-circle' : 'plus-circle-outline',
-            compare: focused ? 'chart-bar' : 'chart-bar',
-            history: focused ? 'history' : 'history'
+            capture: focused ? 'home' : 'home-outline',
+            compare: focused ? 'compare' : 'compare',
+            history: focused ? 'history' : 'history',
+            profile: focused ? 'account' : 'account-outline'
           };
 
-          return (
-            <MaterialCommunityIcons
-              color={color}
-              name={iconByRoute[route.name] ?? 'circle-outline'}
-              size={size + 2}
-            />
-          );
+          return <MaterialCommunityIcons color={color} name={iconByRoute[route.name] ?? 'circle-outline'} size={20} />;
         }
       })}
     >
       <Tabs.Screen name="index" options={{ href: null }} />
-      <Tabs.Screen name="capture" options={{ title: t('tabs_capture') }} />
-      <Tabs.Screen name="compare" options={{ title: t('tabs_compare') }} />
-      <Tabs.Screen name="history" options={{ title: t('tabs_history') }} />
+      <Tabs.Screen name="capture" options={{ title: 'Capture' }} />
+      <Tabs.Screen name="compare" options={{ title: 'Compare' }} />
+      <Tabs.Screen name="history" options={{ title: 'History' }} />
+      <Tabs.Screen name="profile" options={{ title: 'Profile' }} />
     </Tabs>
   );
 }
 
 const styles = StyleSheet.create({
   bootScreen: {
+    alignItems: 'center',
+    backgroundColor: colors.background,
     flex: 1,
     justifyContent: 'center',
-    alignItems: 'center',
     paddingHorizontal: spacing.xl
   },
   bootTitle: {
-    marginTop: spacing.lg,
+    color: colors.black,
     fontFamily: typography.display,
-    color: colors.ink900,
-    fontSize: 24
+    fontSize: typography.sizes.headingMd,
+    marginTop: spacing.xl,
+    textAlign: 'center'
   },
   bootSubtitle: {
-    marginTop: spacing.sm,
+    color: colors.textTertiary,
     fontFamily: typography.body,
-    color: colors.ink700,
-    fontSize: 14
+    fontSize: typography.sizes.body,
+    marginTop: spacing.xs,
+    textAlign: 'center'
+  },
+  versionText: {
+    bottom: spacing.xxl,
+    color: '#C7C7CC',
+    fontFamily: typography.body,
+    fontSize: typography.sizes.micro,
+    letterSpacing: 0.4,
+    position: 'absolute'
   },
   errorTitle: {
+    color: colors.danger,
     fontFamily: typography.display,
-    color: colors.coral500,
-    fontSize: 24,
+    fontSize: typography.sizes.headingMd,
     marginBottom: spacing.sm
   },
   errorText: {
+    color: colors.textSecondary,
     fontFamily: typography.body,
-    color: colors.ink700,
-    textAlign: 'center',
-    marginBottom: spacing.lg
+    textAlign: 'center'
   },
   retryButton: {
-    backgroundColor: colors.ink900,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.xl,
+    alignItems: 'center',
+    backgroundColor: colors.primary,
+    borderRadius: radius.lg,
+    marginTop: spacing.lg,
+    minWidth: 120,
+    paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm
   },
   retryText: {
     color: colors.white,
     fontFamily: typography.body,
+    fontSize: typography.sizes.body,
     fontWeight: '700'
+  },
+  tabBar: {
+    backgroundColor: colors.surfaceOverlay,
+    borderTopColor: colors.divider,
+    borderTopWidth: 1,
+    height: 82,
+    paddingBottom: 14,
+    paddingTop: 6
+  },
+  tabLabel: {
+    fontFamily: typography.body,
+    fontSize: typography.sizes.micro,
+    fontWeight: '500',
+    marginTop: 2
   }
 });

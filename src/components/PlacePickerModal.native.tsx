@@ -1,3 +1,4 @@
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -11,6 +12,7 @@ import {
 } from 'react-native';
 import MapView, { MapPressEvent, Marker, Region } from 'react-native-maps';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { PrimaryButton } from './ui/PrimaryButton';
 import { usePlaceSearch } from '../hooks/usePlaceSearch';
 import {
   PlaceSuggestion,
@@ -20,7 +22,7 @@ import {
 } from '../services/placesService';
 import { captureCurrentLocation, reverseGeocodeToArea } from '../services/locationService';
 import { useI18n } from '../i18n/useI18n';
-import { colors, radius, spacing, typography } from '../theme/tokens';
+import { colors, radius, shadows, spacing, typography } from '../theme/tokens';
 import { Coordinates, PlaceSelection } from '../types/domain';
 
 type PlacePickerModalProps = {
@@ -49,6 +51,7 @@ const buildFallbackMessage = (status: PlacesApiStatus, t: ReturnType<typeof useI
   if (status.reason === 'quota-exceeded') {
     return t('search_quota');
   }
+
   if (status.reason === 'request-denied') {
     return t('search_denied');
   }
@@ -76,19 +79,22 @@ export const PlacePickerModal = ({
   const [mapRegion, setMapRegion] = useState<Region>(regionFromCoordinates(initialCoordinates));
   const [selectedSuggestionId, setSelectedSuggestionId] = useState<string | null>(null);
 
-  const resolveAddress = useCallback(async (nextCoordinates: Coordinates) => {
-    setIsResolvingAddress(true);
+  const resolveAddress = useCallback(
+    async (nextCoordinates: Coordinates) => {
+      setIsResolvingAddress(true);
 
-    try {
-      const reverse = await reverseGeocodeToArea(nextCoordinates);
-      setCityArea(reverse.cityArea);
-      setAddressLine(reverse.addressLine);
-    } catch {
-      setCityArea(notSelectedLabel);
-    } finally {
-      setIsResolvingAddress(false);
-    }
-  }, [notSelectedLabel]);
+      try {
+        const reverse = await reverseGeocodeToArea(nextCoordinates);
+        setCityArea(reverse.cityArea);
+        setAddressLine(reverse.addressLine);
+      } catch {
+        setCityArea(notSelectedLabel);
+      } finally {
+        setIsResolvingAddress(false);
+      }
+    },
+    [notSelectedLabel]
+  );
 
   useEffect(() => {
     if (!visible) {
@@ -96,7 +102,6 @@ export const PlacePickerModal = ({
     }
 
     const initStatus = getInitialPlacesApiStatus();
-    console.warn('[PlacePicker] initial API status', initStatus);
     setApiStatus(initStatus);
     setSearchQuery('');
     setCoordinates(initialCoordinates);
@@ -123,15 +128,10 @@ export const PlacePickerModal = ({
     if (reason === 'request-failed') {
       return;
     }
-    console.warn('[PlacePicker] switching to pin-only mode', { reason });
     setApiStatus({ mode: 'pin-only', reason });
   }, []);
 
-  const {
-    suggestions,
-    isLoading: isSearchLoading,
-    errorMessage
-  } = usePlaceSearch(searchQuery, apiStatus, onSearchFailure);
+  const { suggestions, isLoading: isSearchLoading, errorMessage } = usePlaceSearch(searchQuery, apiStatus, onSearchFailure);
 
   const fallbackMessage = useMemo(() => buildFallbackMessage(apiStatus, t), [apiStatus, t]);
 
@@ -153,10 +153,6 @@ export const PlacePickerModal = ({
       setAddressLine(details.address || reverse.addressLine);
       setSearchQuery(suggestion.primaryText);
     } catch {
-      console.warn('[PlacePicker] failed to resolve place details', {
-        placeId: suggestion.placeId,
-        label: suggestion.primaryText
-      });
       setSuggestedStoreName(suggestion.primaryText);
     } finally {
       setSelectedSuggestionId(null);
@@ -173,7 +169,7 @@ export const PlacePickerModal = ({
     void updateFromMapCoordinate(nextCoordinates);
   };
 
-  const handleConfirm = () => {
+  const handleConfirmSelection = () => {
     onConfirm({
       latitude: coordinates.latitude,
       longitude: coordinates.longitude,
@@ -184,97 +180,137 @@ export const PlacePickerModal = ({
     onClose();
   };
 
+  const handleUseCurrentLocation = async () => {
+    const result = await captureCurrentLocation();
+    if (result.status === 'granted') {
+      setCoordinates(result.coordinates);
+      setCityArea(result.cityArea);
+      setAddressLine(result.addressLine);
+      setMapRegion(regionFromCoordinates(result.coordinates));
+    }
+  };
+
   return (
     <Modal animationType="slide" presentationStyle="fullScreen" visible={visible}>
       <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.screen}>
-        <View style={[styles.header, { paddingTop: Math.max(insets.top, spacing.md) }]}>
-          <Pressable onPress={onClose} style={styles.headerButton}>
-            <Text style={styles.headerButtonText}>{t('cancel')}</Text>
+        <View style={[styles.header, { paddingTop: Math.max(insets.top, spacing.sm) }]}>
+          <Pressable onPress={onClose} style={styles.headerAction}>
+            <Text style={styles.headerActionText}>{t('cancel')}</Text>
           </Pressable>
           <Text style={styles.headerTitle}>{t('pick_place')}</Text>
-          <Pressable onPress={handleConfirm} style={styles.confirmButton}>
-            <Text style={styles.confirmButtonText}>{t('confirm')}</Text>
+          <Pressable onPress={handleConfirmSelection} style={styles.headerActionRight}>
+            <Text style={styles.headerConfirmText}>{t('confirm')}</Text>
           </Pressable>
         </View>
 
-        <View style={styles.searchWrap}>
-          <TextInput
-            editable={apiStatus.mode === 'search-enabled'}
-            onChangeText={setSearchQuery}
-            placeholder={
-              apiStatus.mode === 'search-enabled'
-                ? t('search_placeholder')
-                : t('search_disabled_placeholder')
-            }
-            placeholderTextColor={colors.slate500}
-            style={[styles.searchInput, apiStatus.mode !== 'search-enabled' && styles.searchDisabled]}
-            value={searchQuery}
-          />
-          <Text style={styles.helperText}>
-            {fallbackMessage ?? t('search_hint')}
-          </Text>
-          {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
-        </View>
+        <View style={styles.mapShell}>
+          {isInitializingLocation ? (
+            <View style={styles.mapLoadingWrap}>
+              <ActivityIndicator color={colors.primary} size="large" />
+              <Text style={styles.loaderText}>{t('map_centering')}</Text>
+            </View>
+          ) : (
+            <MapView
+              onPress={handleMapPress}
+              region={mapRegion}
+              style={styles.map}
+              onRegionChangeComplete={(region: Region) => setMapRegion(region)}
+            >
+              <Marker
+                coordinate={coordinates}
+                draggable
+                pinColor={colors.mapPin}
+                onDragEnd={(event) => {
+                  void updateFromMapCoordinate(event.nativeEvent.coordinate);
+                }}
+              />
+            </MapView>
+          )}
 
-        {apiStatus.mode === 'search-enabled' && (isSearchLoading || suggestions.length > 0) ? (
-          <View style={styles.suggestionPanel}>
-            {isSearchLoading ? (
-              <View style={styles.loaderRow}>
-                <ActivityIndicator color={colors.sea500} size="small" />
-                <Text style={styles.loaderText}>{t('searching_places')}</Text>
+          <View style={styles.searchWrap}>
+            <View style={styles.searchInputShell}>
+              <MaterialCommunityIcons color={colors.textSecondary} name="magnify" size={16} style={styles.searchIcon} />
+              <TextInput
+                editable={apiStatus.mode === 'search-enabled'}
+                onChangeText={setSearchQuery}
+                placeholder={t('search_placeholder_short')}
+                placeholderTextColor={colors.textSecondary}
+                style={styles.searchInput}
+                value={searchQuery}
+              />
+              <MaterialCommunityIcons color={colors.textSecondary} name="microphone-outline" size={16} />
+            </View>
+            {fallbackMessage ? <Text style={styles.helperText}>{fallbackMessage}</Text> : null}
+            {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
+          </View>
+
+          <View style={styles.controlsWrap}>
+            <Pressable onPress={handleUseCurrentLocation} style={styles.mapControlButton}>
+              <MaterialCommunityIcons color={colors.primary} name="crosshairs-gps" size={18} />
+            </Pressable>
+            <Pressable onPress={() => setMapRegion(regionFromCoordinates(coordinates))} style={styles.mapControlButton}>
+              <MaterialCommunityIcons color={colors.primary} name="navigation-variant" size={18} />
+            </Pressable>
+          </View>
+
+          {apiStatus.mode === 'search-enabled' && (isSearchLoading || suggestions.length > 0) ? (
+            <View style={styles.suggestionPanel}>
+              {isSearchLoading ? (
+                <View style={styles.loaderRow}>
+                  <ActivityIndicator color={colors.primary} size="small" />
+                  <Text style={styles.loaderText}>{t('searching_places')}</Text>
+                </View>
+              ) : (
+                <ScrollView keyboardShouldPersistTaps="handled">
+                  {suggestions.map((suggestion) => (
+                    <Pressable
+                      key={suggestion.placeId}
+                      onPress={() => void handleSuggestionSelect(suggestion)}
+                      style={styles.suggestionItem}
+                    >
+                      <Text style={styles.suggestionPrimary}>{suggestion.primaryText}</Text>
+                      {suggestion.secondaryText ? (
+                        <Text style={styles.suggestionSecondary}>{suggestion.secondaryText}</Text>
+                      ) : null}
+                      {selectedSuggestionId === suggestion.placeId ? (
+                        <Text style={styles.loaderText}>{t('applying')}</Text>
+                      ) : null}
+                    </Pressable>
+                  ))}
+                </ScrollView>
+              )}
+            </View>
+          ) : null}
+
+          <View style={styles.sheet}>
+            <View style={styles.sheetHandle} />
+            <View style={styles.sheetHeaderRow}>
+              <View style={styles.sheetTitleWrap}>
+                <Text style={styles.sheetTitle}>{suggestedStoreName || t('selected_place')}</Text>
+                <Text style={styles.sheetSubtitle}>{cityArea}</Text>
               </View>
-            ) : (
-              <ScrollView keyboardShouldPersistTaps="handled">
-                {suggestions.map((suggestion) => (
-                  <Pressable
-                    key={suggestion.placeId}
-                    onPress={() => void handleSuggestionSelect(suggestion)}
-                    style={styles.suggestionItem}
-                  >
-                    <Text style={styles.suggestionPrimary}>{suggestion.primaryText}</Text>
-                    {suggestion.secondaryText ? (
-                      <Text style={styles.suggestionSecondary}>{suggestion.secondaryText}</Text>
-                    ) : null}
-                    {selectedSuggestionId === suggestion.placeId ? (
-                      <Text style={styles.loaderText}>{t('applying')}</Text>
-                    ) : null}
-                  </Pressable>
-                ))}
-              </ScrollView>
-            )}
-          </View>
-        ) : null}
+              <Pressable onPress={onClose} style={styles.closeButton}>
+                <MaterialCommunityIcons color={colors.textSecondary} name="close" size={18} />
+              </Pressable>
+            </View>
 
-        {isInitializingLocation ? (
-          <View style={styles.mapLoadingWrap}>
-            <ActivityIndicator color={colors.sea500} size="large" />
-            <Text style={styles.loaderText}>{t('map_centering')}</Text>
-          </View>
-        ) : (
-          <MapView
-            onPress={handleMapPress}
-            region={mapRegion}
-            style={styles.map}
-            onRegionChangeComplete={(region: Region) => setMapRegion(region)}
-          >
-            <Marker
-              coordinate={coordinates}
-              draggable
-              onDragEnd={(event) => {
-                void updateFromMapCoordinate(event.nativeEvent.coordinate);
-              }}
-            />
-          </MapView>
-        )}
+            <View style={styles.detailRow}>
+              <MaterialCommunityIcons color={colors.primary} name="map-marker" size={18} style={styles.detailIcon} />
+              <View style={styles.detailTextWrap}>
+                <Text style={styles.detailPrimary}>{addressLine || t('no_address')}</Text>
+                <Text style={styles.detailSecondary}>{cityArea}</Text>
+              </View>
+            </View>
 
-        <View style={styles.selectionCard}>
-          <Text style={styles.selectionTitle}>{suggestedStoreName || t('selected_place')}</Text>
-          <Text style={styles.selectionText}>{cityArea}</Text>
-          <Text style={styles.selectionText}>{addressLine || t('no_address')}</Text>
-          <Text style={styles.selectionText}>
-            {coordinates.latitude.toFixed(6)}, {coordinates.longitude.toFixed(6)}
-          </Text>
-          {isResolvingAddress ? <Text style={styles.loaderText}>{t('resolving_address')}</Text> : null}
+            <View style={styles.detailRow}>
+              <MaterialCommunityIcons color={colors.textSecondary} name="clock-outline" size={18} style={styles.detailIcon} />
+              <Text style={styles.detailSecondary}>{t('compare_open_24h')}</Text>
+            </View>
+
+            {isResolvingAddress ? <Text style={styles.loaderText}>{t('resolving_address')}</Text> : null}
+
+            <PrimaryButton label={t('confirm_location')} onPress={handleConfirmSelection} style={styles.confirmButton} />
+          </View>
         </View>
       </SafeAreaView>
     </Modal>
@@ -283,133 +319,231 @@ export const PlacePickerModal = ({
 
 const styles = StyleSheet.create({
   screen: {
-    flex: 1,
-    backgroundColor: colors.white
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.sky200
-  },
-  headerTitle: {
-    color: colors.ink900,
-    fontFamily: typography.display,
-    fontSize: 20
-  },
-  headerButton: {
-    minWidth: 70
-  },
-  headerButtonText: {
-    color: colors.ink700,
-    fontFamily: typography.body,
-    fontWeight: '700'
-  },
-  confirmButton: {
-    minWidth: 70,
-    alignItems: 'flex-end'
-  },
-  confirmButtonText: {
-    color: colors.sea500,
-    fontFamily: typography.body,
-    fontWeight: '700'
-  },
-  searchWrap: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.sm
-  },
-  searchInput: {
-    borderWidth: 1,
-    borderColor: colors.slate300,
-    borderRadius: radius.md,
-    backgroundColor: colors.slate100,
-    color: colors.ink900,
-    fontFamily: typography.body,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm
-  },
-  searchDisabled: {
-    opacity: 0.6
-  },
-  helperText: {
-    marginTop: spacing.xs,
-    color: colors.ink700,
-    fontFamily: typography.body,
-    fontSize: 12
-  },
-  errorText: {
-    marginTop: spacing.xs,
-    color: colors.coral500,
-    fontFamily: typography.body,
-    fontSize: 12
-  },
-  suggestionPanel: {
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.sky200,
-    borderRadius: radius.md,
-    maxHeight: 180,
-    backgroundColor: colors.white
-  },
-  suggestionItem: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.sky100
-  },
-  suggestionPrimary: {
-    color: colors.ink900,
-    fontFamily: typography.body,
-    fontWeight: '700',
-    fontSize: 13
-  },
-  suggestionSecondary: {
-    marginTop: 2,
-    color: colors.ink700,
-    fontFamily: typography.body,
-    fontSize: 12
-  },
-  map: {
+    backgroundColor: colors.white,
     flex: 1
   },
-  mapLoadingWrap: {
-    flex: 1,
+  header: {
     alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.95)',
+    borderBottomColor: 'rgba(198,198,200,0.5)',
+    borderBottomWidth: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    minHeight: 50,
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.xs
+  },
+  headerAction: {
+    minWidth: 76
+  },
+  headerActionRight: {
+    alignItems: 'flex-end',
+    minWidth: 76
+  },
+  headerActionText: {
+    color: colors.primary,
+    fontFamily: typography.body,
+    fontSize: typography.sizes.title,
+    lineHeight: 26
+  },
+  headerTitle: {
+    color: colors.black,
+    fontFamily: typography.body,
+    fontSize: typography.sizes.title,
+    fontWeight: '700',
+    lineHeight: 26
+  },
+  headerConfirmText: {
+    color: colors.primary,
+    fontFamily: typography.body,
+    fontSize: typography.sizes.title,
+    fontWeight: '700',
+    lineHeight: 26
+  },
+  mapShell: {
+    flex: 1,
+    position: 'relative'
+  },
+  map: {
+    ...StyleSheet.absoluteFillObject
+  },
+  mapLoadingWrap: {
+    alignItems: 'center',
+    flex: 1,
     justifyContent: 'center',
     rowGap: spacing.sm
   },
-  selectionCard: {
-    borderTopWidth: 1,
-    borderTopColor: colors.sky200,
-    backgroundColor: colors.white,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    rowGap: 3
+  searchWrap: {
+    left: spacing.md,
+    position: 'absolute',
+    right: spacing.md,
+    top: spacing.md
   },
-  selectionTitle: {
-    color: colors.ink900,
-    fontFamily: typography.display,
-    fontSize: 18
+  searchInputShell: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(227,227,232,0.8)',
+    borderRadius: radius.lg,
+    flexDirection: 'row',
+    minHeight: 44,
+    paddingHorizontal: spacing.sm,
+    ...shadows.soft
   },
-  selectionText: {
-    color: colors.ink700,
+  searchIcon: {
+    marginRight: spacing.xs
+  },
+  searchInput: {
+    color: colors.textPrimary,
+    flex: 1,
     fontFamily: typography.body,
-    fontSize: 12
+    fontSize: typography.sizes.title,
+    lineHeight: 24
+  },
+  helperText: {
+    color: colors.white,
+    fontFamily: typography.body,
+    fontSize: typography.sizes.micro,
+    marginTop: spacing.xs,
+    textShadowColor: 'rgba(0,0,0,0.35)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2
+  },
+  errorText: {
+    color: '#FEE2E2',
+    fontFamily: typography.body,
+    fontSize: typography.sizes.micro,
+    marginTop: spacing.xxs
+  },
+  controlsWrap: {
+    gap: spacing.sm,
+    position: 'absolute',
+    right: spacing.md,
+    top: 108
+  },
+  mapControlButton: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    borderRadius: 10,
+    height: 44,
+    justifyContent: 'center',
+    width: 44,
+    ...shadows.soft
+  },
+  suggestionPanel: {
+    backgroundColor: colors.white,
+    borderColor: colors.borderSubtle,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    left: spacing.md,
+    maxHeight: 220,
+    position: 'absolute',
+    right: spacing.md,
+    top: 66,
+    ...shadows.card
+  },
+  suggestionItem: {
+    borderBottomColor: colors.dividerSoft,
+    borderBottomWidth: 1,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm
+  },
+  suggestionPrimary: {
+    color: colors.textPrimary,
+    fontFamily: typography.body,
+    fontSize: typography.sizes.caption,
+    fontWeight: '700'
+  },
+  suggestionSecondary: {
+    color: colors.textSecondary,
+    fontFamily: typography.body,
+    fontSize: typography.sizes.caption,
+    marginTop: 2
   },
   loaderRow: {
-    flexDirection: 'row',
     alignItems: 'center',
     columnGap: spacing.sm,
+    flexDirection: 'row',
     padding: spacing.md
   },
   loaderText: {
-    color: colors.slate500,
+    color: colors.textSecondary,
     fontFamily: typography.body,
-    fontSize: 12
+    fontSize: typography.sizes.caption
+  },
+  sheet: {
+    backgroundColor: colors.white,
+    borderTopLeftRadius: 14,
+    borderTopRightRadius: 14,
+    bottom: 0,
+    left: 0,
+    paddingBottom: spacing.md,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.xs,
+    position: 'absolute',
+    right: 0,
+    ...shadows.floating
+  },
+  sheetHandle: {
+    alignSelf: 'center',
+    backgroundColor: '#D1D1D6',
+    borderRadius: 999,
+    height: 4,
+    marginBottom: spacing.xs,
+    width: 36
+  },
+  sheetHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between'
+  },
+  sheetTitleWrap: {
+    flex: 1,
+    paddingRight: spacing.md
+  },
+  sheetTitle: {
+    color: colors.black,
+    fontFamily: typography.display,
+    fontSize: typography.sizes.headingMd,
+    lineHeight: 28
+  },
+  sheetSubtitle: {
+    color: colors.textSecondary,
+    fontFamily: typography.body,
+    fontSize: typography.sizes.body,
+    lineHeight: 22,
+    marginTop: spacing.xxs
+  },
+  closeButton: {
+    alignItems: 'center',
+    backgroundColor: '#E3E3E8',
+    borderRadius: 15,
+    height: 30,
+    justifyContent: 'center',
+    marginTop: spacing.xs,
+    width: 30
+  },
+  detailRow: {
+    flexDirection: 'row',
+    marginTop: spacing.sm
+  },
+  detailIcon: {
+    marginRight: spacing.sm,
+    marginTop: 1
+  },
+  detailTextWrap: {
+    flex: 1
+  },
+  detailPrimary: {
+    color: colors.black,
+    fontFamily: typography.body,
+    fontSize: typography.sizes.title,
+    lineHeight: 24
+  },
+  detailSecondary: {
+    color: colors.textSecondary,
+    fontFamily: typography.body,
+    fontSize: typography.sizes.body,
+    lineHeight: 21
+  },
+  confirmButton: {
+    marginTop: spacing.lg
   }
 });

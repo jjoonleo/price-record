@@ -1,41 +1,62 @@
 import { Platform } from 'react-native';
 
 export const colors = {
-  ink900: '#12243B',
-  ink700: '#35506F',
-  sky100: '#EDF7FF',
-  sky200: '#DCEEFF',
-  sky300: '#C4E3FF',
-  mint200: '#C9F3EA',
-  sea500: '#1C7C8C',
-  coral500: '#F1644E',
-  amber500: '#F1A93B',
+  background: '#F2F2F7',
+  surface: '#FFFFFF',
+  surfaceMuted: '#F3F4F6',
+  surfaceOverlay: 'rgba(255,255,255,0.92)',
+  textPrimary: '#111827',
+  textSecondary: '#6B7280',
+  textTertiary: '#9CA3AF',
+  textDisabled: '#C7CDD6',
+  divider: '#E5E7EB',
+  dividerSoft: '#F3F4F6',
+  borderSubtle: 'rgba(0,0,0,0.05)',
+  primary: '#007AFF',
+  success: '#34C759',
+  warning: '#FF9500',
+  danger: '#EF4444',
   white: '#FFFFFF',
-  slate100: '#F5F8FC',
-  slate300: '#D5DFED',
-  slate500: '#8A9AB0'
+  black: '#000000',
+  mapPin: '#FF3B30',
+  ink900: '#111827',
+  ink700: '#6B7280',
+  sky100: '#F3F4F6',
+  sky200: '#E5E7EB',
+  sky300: '#D1D5DB',
+  mint200: '#DCFCE7',
+  sea500: '#007AFF',
+  coral500: '#EF4444',
+  amber500: '#FF9500',
+  slate100: '#F3F4F6',
+  slate300: '#D1D5DB',
+  slate500: '#9CA3AF'
 };
 
 export const gradients = {
-  screen: ['#EAF5FF', '#F7FBFF', '#E8FFF9'] as const,
-  card: ['#FFFFFF', '#F4FAFF'] as const,
-  highlight: ['#DBF4F5', '#FFF4E7'] as const
+  screen: [colors.background, colors.background] as const,
+  card: [colors.surface, colors.surface] as const,
+  highlight: ['#EFF6FF', '#F8FAFC'] as const
 };
 
 export const radius = {
-  sm: 10,
-  md: 16,
-  lg: 24,
-  xl: 32
+  xs: 4,
+  sm: 8,
+  md: 10,
+  lg: 12,
+  xl: 14,
+  xxl: 20
 };
 
 export const spacing = {
-  xs: 6,
-  sm: 10,
-  md: 14,
+  xxs: 4,
+  xs: 8,
+  sm: 12,
+  md: 16,
   lg: 20,
-  xl: 28,
-  xxl: 36
+  xl: 24,
+  xxl: 32,
+  xxxl: 40
 };
 
 export const typography = {
@@ -53,15 +74,39 @@ export const typography = {
     ios: 'Menlo',
     android: 'monospace',
     default: 'monospace'
-  })
+  }),
+  sizes: {
+    headingXl: 34,
+    headingLg: 28,
+    headingMd: 22,
+    headingSm: 20,
+    title: 17,
+    body: 15,
+    caption: 13,
+    micro: 11
+  }
 };
 
 export const shadows = {
-  soft: {
-    shadowColor: '#163150',
-    shadowOffset: { width: 0, height: 8 },
+  card: {
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2
+  },
+  floating: {
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.08,
-    shadowRadius: 20,
-    elevation: 3
+    shadowRadius: 12,
+    elevation: 6
+  },
+  soft: {
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2
   }
 };
