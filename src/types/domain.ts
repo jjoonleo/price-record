@@ -8,6 +8,7 @@ export type Product = {
 export type Store = {
   id: string;
   name: string;
+  nickname?: string;
   latitude: number;
   longitude: number;
   cityArea: string;

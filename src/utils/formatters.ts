@@ -32,3 +32,8 @@ export const compactStoreLabel = (name: string): string => {
   const trimmed = name.trim();
   return trimmed.length > 12 ? `${trimmed.slice(0, 11)}…` : trimmed;
 };
+
+export const getDisplayStoreName = (store: { name: string; nickname?: string | null }): string => {
+  const nickname = store.nickname?.trim();
+  return nickname ? nickname : store.name;
+};

@@ -10,6 +10,7 @@ export type WebProduct = {
 export type WebStore = {
   id: string;
   name: string;
+  nickname?: string;
   latitude: number;
   longitude: number;
   cityArea: string;
@@ -66,6 +67,7 @@ export const readWebDb = (): WebDb => {
     const stores = Array.isArray(parsed.stores)
       ? parsed.stores.map((store) => ({
           ...store,
+          nickname: typeof store?.nickname === 'string' ? store.nickname : undefined,
           addressLine: typeof store?.addressLine === 'string' ? store.addressLine : ''
         }))
       : [];

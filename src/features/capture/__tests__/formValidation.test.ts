@@ -9,7 +9,7 @@ const messages = {
   priceRequired: 'price required',
   priceInvalidInteger: 'price integer',
   pricePositive: 'price positive',
-  storeRequired: 'store required',
+  systemStoreRequired: 'system store required',
   cityAreaRequired: 'city required',
   dateRequired: 'date required',
   locationRequired: 'location required',
@@ -24,7 +24,8 @@ const createValidValues = () => ({
   ...getCaptureFormDefaults(),
   productName: 'Green Tea',
   priceYen: '250',
-  storeName: 'Lawson',
+  systemStoreName: 'Lawson Marunouchi',
+  storeNickname: 'My Lawson',
   cityArea: 'Chiyoda',
   latitude: '35.6812',
   longitude: '139.7671',
@@ -38,16 +39,16 @@ describe('createCaptureFormSchema', () => {
     expect(result.success).toBe(true);
   });
 
-  test('requires product and store names', () => {
+  test('requires product and system store names', () => {
     const result = schema.safeParse({
       ...createValidValues(),
       productName: ' ',
-      storeName: ' '
+      systemStoreName: ' '
     });
     expect(result.success).toBe(false);
     if (result.success) return;
     expect(result.error.flatten().fieldErrors.productName).toContain(messages.productRequired);
-    expect(result.error.flatten().fieldErrors.storeName).toContain(messages.storeRequired);
+    expect(result.error.flatten().fieldErrors.systemStoreName).toContain(messages.systemStoreRequired);
   });
 
   test('requires price value', () => {
@@ -120,5 +121,13 @@ describe('createCaptureFormSchema', () => {
     expect(result.success).toBe(false);
     if (result.success) return;
     expect(result.error.flatten().fieldErrors.notes).toContain(messages.notesTooLong);
+  });
+
+  test('allows empty nickname', () => {
+    const result = schema.safeParse({
+      ...createValidValues(),
+      storeNickname: '   '
+    });
+    expect(result.success).toBe(true);
   });
 });

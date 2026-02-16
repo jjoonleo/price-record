@@ -12,7 +12,7 @@ type CaptureValidationMessages = {
   priceRequired: string;
   priceInvalidInteger: string;
   pricePositive: string;
-  storeRequired: string;
+  systemStoreRequired: string;
   cityAreaRequired: string;
   dateRequired: string;
   locationRequired: string;
@@ -43,7 +43,8 @@ export const createCaptureFormSchema = (messages: CaptureValidationMessages) =>
         .min(1, messages.priceRequired)
         .refine((value) => /^\d+$/.test(value), messages.priceInvalidInteger)
         .refine((value) => Number(value) > 0, messages.pricePositive),
-      storeName: z.string().trim().min(1, messages.storeRequired),
+      systemStoreName: z.string().trim().min(1, messages.systemStoreRequired),
+      storeNickname: z.string(),
       cityArea: z.string().trim().min(1, messages.cityAreaRequired),
       latitude: createCoordinateValidator(-90, 90, messages.coordinatesInvalid),
       longitude: createCoordinateValidator(-180, 180, messages.coordinatesInvalid),
@@ -66,6 +67,13 @@ export const createCaptureFormSchema = (messages: CaptureValidationMessages) =>
           path: ['addressLine']
         });
       }
+      if (value.systemStoreName.trim().length === 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: messages.systemStoreRequired,
+          path: ['systemStoreName']
+        });
+      }
     });
 
 export type CaptureFormValues = z.infer<ReturnType<typeof createCaptureFormSchema>>;
@@ -73,7 +81,8 @@ export type CaptureFormValues = z.infer<ReturnType<typeof createCaptureFormSchem
 export const getCaptureFormDefaults = (): CaptureFormValues => ({
   productName: '',
   priceYen: '',
-  storeName: '',
+  systemStoreName: '',
+  storeNickname: '',
   cityArea: '',
   latitude: DEFAULT_CAPTURE_COORDINATES.latitude.toString(),
   longitude: DEFAULT_CAPTURE_COORDINATES.longitude.toString(),
