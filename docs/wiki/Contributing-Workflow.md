@@ -45,6 +45,7 @@
 | Ranking/model formula changes | `Ranking-Engine-and-Decision-Logic.md`, `Testing-QA-and-Regression-Checklist.md` |
 | Location/search/map behavior changes | `Location-Maps-and-Places-Integration.md`, `Release-Runbook-and-Troubleshooting.md` |
 | Shared state/i18n/token updates | `State-I18n-and-Platform-Variants.md` |
+| Large UI refactor or micro-component split | `AI-Agent-Component-Development-Playbook.md`, `Screen-Flows-and-UX-States.md` |
 | Process/policy updates | `Developer-Rules-and-Engineering-Standards.md`, this page |
 
 ## Review Expectations
@@ -60,5 +61,6 @@
 
 ## Related Pages
 - [Developer Rules and Engineering Standards](./Developer-Rules-and-Engineering-Standards.md)
+- [AI Agent Component Development Playbook](./AI-Agent-Component-Development-Playbook.md)
 - [Testing, QA, and Regression Checklist](./Testing-QA-and-Regression-Checklist.md)
 - [GitHub Wiki Publish Guide](./GitHub-Wiki-Publish-Guide.md)
