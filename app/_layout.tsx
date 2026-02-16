@@ -82,6 +82,7 @@ export default function RootLayout() {
       <Tabs.Screen name="compare" options={{ title: 'Compare' }} />
       <Tabs.Screen name="history" options={{ title: 'History' }} />
       <Tabs.Screen name="profile" options={{ title: 'Profile' }} />
+      <Tabs.Screen name="product-price-detail" options={{ href: null }} />
     </Tabs>
   );
 }
