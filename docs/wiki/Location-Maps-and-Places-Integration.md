@@ -51,29 +51,30 @@ Search behavior:
 - Missing key returns empty result set.
 - HTTP/network errors raise `PlacesApiError` with normalized reason.
 
-## Search Hook Behavior
-Source: `src/hooks/usePlaceSearch.ts`.
+## Place-Picker Feature State Behavior
+Sources:
+- `src/features/placePicker/store/createPlacePickerStore.ts`
+- `src/features/placePicker/hooks/usePlacePickerController.ts`
 
 Behavior:
-- Debounce: 350ms after query change.
-- Only executes when `apiStatus.mode === "search-enabled"`.
-- Clears suggestions on empty query or pin-only mode.
-- On API failure:
-- Sets error message.
-- Clears suggestions.
-- Invokes `onSearchFailure` to allow mode downgrade.
+- Debounce: 350ms after query change (`PLACE_SEARCH_DEBOUNCE_MS`).
+- Search executes only when `apiStatus.mode === "search-enabled"`.
+- Suggestions clear on empty query or pin-only mode.
+- Quota/denied failures downgrade mode to pin-only with normalized reason.
+- Search/details/location async behavior is orchestrated by controller + scoped store actions (not component-local state).
 
 ## Native vs Web Map Behavior
 ### Native (`PlacePickerModal.native.tsx`, `StoreMap.native.tsx`)
 - Full-screen modal with interactive `MapView`.
-- Marker updates by map press and drag.
-- Can center on current location at modal initialization.
+- Place marker syncs from feature-selected coordinates.
+- Current-location action can center map and update user marker state.
 - Search suggestions can update marker via place details.
 
 ### Web (`PlacePickerModal.web.tsx`, `StoreMap.web.tsx`)
-- No interactive map canvas for store picker/map section.
-- Uses summary card and list fallback for store display.
-- Current location action is still available.
+- Full-screen modal with interactive Leaflet map in place picker.
+- Selected-place marker and current-location marker are managed via map refs.
+- Current location action can re-center map and keep search/pin-only fallback behavior.
+- `StoreMap.web.tsx` remains a non-interactive list fallback for compare screen.
 
 ## Environment and Key Setup
 Environment variable:
@@ -98,8 +99,8 @@ Without key:
 
 ## Observability Signals
 Current logs:
-- Place picker logs mode changes and place details failures using `console.warn`.
-- Search hook logs API/unknown search errors.
+- Places/location failures surface as feature-state error/status messages in the picker.
+- No dedicated telemetry pipeline yet; console logging should be added only with actionable context.
 
 Guideline:
 - Keep logs structured and actionable (include reason + context).

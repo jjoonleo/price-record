@@ -1,19 +1,33 @@
 # State, i18n, and Platform Variants
 
 ## Shared UI State (`zustand`)
-Source: `src/state/useFiltersStore.ts`.
+Sources:
+- `src/state/useFiltersStore.ts`
+- `src/features/placePicker/store/createPlacePickerStore.ts`
+- `src/features/placePicker/store/placePickerStoreContext.tsx`
 
-Store shape:
+Global store shape (`useFiltersStore`):
 - `selectedProductId: string | null`
 - `selectedCityArea: string | null`
 - `selectedStoreId: string | null`
 - Setters for each value.
 - `clearHistoryStoreFilter()`
 
-Usage contracts:
+Global usage contracts:
 - Compare screen owns `selectedProductId` and `selectedCityArea`.
 - History screen owns `selectedStoreId` filter chips.
 - Compare actions intentionally clear history-store filter when product changes.
+
+Scoped place-picker store shape (`createPlacePickerStore`):
+- Session state for search (`apiStatus`, `searchQuery`, `suggestions`, loading/error).
+- Selected place state (`coordinates`, `cityArea`, `addressLine`, `suggestedStoreName`, `websiteUri`).
+- Location state (`currentLocationCoordinates`, initializing/locating flags, status message).
+- Modal/session orchestration (`initialSelectionQuery`, hydration flag, map error).
+
+Scoped usage contracts:
+- `PlacePickerModal.native.tsx` and `PlacePickerModal.web.tsx` create a store per modal scope via `PlacePickerStoreProvider`.
+- Components keep UI-only state local (sheet animation, map refs, focus panels).
+- Feature actions and async orchestration live in `usePlacePickerController` + store actions.
 
 ## i18n Model
 Sources:

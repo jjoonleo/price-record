@@ -1,0 +1,32 @@
+import { PlacePickerStoreState } from '../model/placePickerModel';
+
+export const placePickerSelectors = {
+  apiStatus: (state: PlacePickerStoreState) => state.apiStatus,
+  searchQuery: (state: PlacePickerStoreState) => state.searchQuery,
+  suggestions: (state: PlacePickerStoreState) => state.suggestions,
+  isSearchLoading: (state: PlacePickerStoreState) => state.isSearchLoading,
+  searchErrorMessage: (state: PlacePickerStoreState) => state.searchErrorMessage,
+  selectedSuggestionId: (state: PlacePickerStoreState) => state.selectedSuggestionId,
+  coordinates: (state: PlacePickerStoreState) => state.coordinates,
+  cityArea: (state: PlacePickerStoreState) => state.cityArea,
+  addressLine: (state: PlacePickerStoreState) => state.addressLine,
+  suggestedStoreName: (state: PlacePickerStoreState) => state.suggestedStoreName,
+  websiteUri: (state: PlacePickerStoreState) => state.websiteUri,
+  currentLocationCoordinates: (state: PlacePickerStoreState) => state.currentLocationCoordinates,
+  isInitializingLocation: (state: PlacePickerStoreState) => state.isInitializingLocation,
+  isLocatingCurrent: (state: PlacePickerStoreState) => state.isLocatingCurrent,
+  isResolvingAddress: (state: PlacePickerStoreState) => state.isResolvingAddress,
+  locationStatusMessage: (state: PlacePickerStoreState) => state.locationStatusMessage,
+  mapError: (state: PlacePickerStoreState) => state.mapError,
+  initialSelectionQuery: (state: PlacePickerStoreState) => state.initialSelectionQuery,
+  didHydrateFromInitialSelection: (state: PlacePickerStoreState) => state.didHydrateFromInitialSelection,
+  initializeSession: (state: PlacePickerStoreState) => state.initializeSession,
+  setSearchQuery: (state: PlacePickerStoreState) => state.setSearchQuery,
+  clearSearchQuery: (state: PlacePickerStoreState) => state.clearSearchQuery,
+  searchSuggestionsDebounced: (state: PlacePickerStoreState) => state.searchSuggestionsDebounced,
+  selectSuggestion: (state: PlacePickerStoreState) => state.selectSuggestion,
+  useCurrentLocation: (state: PlacePickerStoreState) => state.useCurrentLocation,
+  setMapError: (state: PlacePickerStoreState) => state.setMapError,
+  markHydrationAttempted: (state: PlacePickerStoreState) => state.markHydrationAttempted,
+  buildConfirmSelection: (state: PlacePickerStoreState) => state.buildConfirmSelection
+};

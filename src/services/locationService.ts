@@ -89,7 +89,7 @@ const reverseGeocodeFallback = async (
   const cityArea = pickCityAreaFromNominatim(body?.address);
 
   return {
-    cityArea,
+    cityArea: cityArea ?? 'Unknown area',
     addressLine: body?.display_name ? toStringIfDefined(body.display_name) : undefined
   };
 };
