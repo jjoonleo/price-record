@@ -3,6 +3,7 @@ import { createId } from '../../utils/id';
 import { HistoryEntry } from '../../types/domain';
 import { Platform } from 'react-native';
 import { readWebDb, updateWebDb } from '../webStore';
+import { getDisplayStoreName } from '../../utils/formatters';
 
 type LatestStorePriceRow = {
   store_id: string;
@@ -53,6 +54,18 @@ type LatestComparable = {
   storeId: string;
   observedAt: string;
   createdAt: string;
+};
+
+export const resolveStoreName = (
+  store: {
+    name: string;
+    nickname?: string | null;
+  } | null | undefined
+): string => {
+  if (!store) {
+    return 'Unknown store';
+  }
+  return getDisplayStoreName(store);
 };
 
 export const selectLatestByStore = <T extends LatestComparable>(rows: T[]): T[] => {
@@ -172,7 +185,7 @@ export const getLatestStorePricesByProduct = async (
         }
         return {
           storeId,
-          storeName: store.name,
+          storeName: resolveStoreName(store),
           cityArea: store.cityArea,
           latitude: store.latitude,
           longitude: store.longitude,
@@ -198,7 +211,7 @@ export const getLatestStorePricesByProduct = async (
         pe.price_yen,
         pe.observed_at,
         pe.created_at,
-        s.name AS store_name,
+        COALESCE(NULLIF(TRIM(s.nickname), ''), s.name) AS store_name,
         s.city_area,
         s.latitude,
         s.longitude,
@@ -275,7 +288,7 @@ export const listHistoryEntries = async ({
           productId: entry.productId,
           productName: product?.name ?? 'Unknown product',
           storeId: entry.storeId,
-          storeName: store?.name ?? 'Unknown store',
+          storeName: resolveStoreName(store),
           cityArea: store?.cityArea ?? 'Unknown area',
           priceYen: entry.priceYen,
           observedAt: entry.observedAt,
@@ -294,7 +307,7 @@ export const listHistoryEntries = async ({
       pe.product_id,
       p.name AS product_name,
       pe.store_id,
-      s.name AS store_name,
+      COALESCE(NULLIF(TRIM(s.nickname), ''), s.name) AS store_name,
       s.city_area,
       pe.price_yen,
       pe.observed_at,

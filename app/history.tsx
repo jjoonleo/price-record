@@ -13,7 +13,7 @@ import { useI18n } from '../src/i18n/useI18n';
 import { useFiltersStore } from '../src/state/useFiltersStore';
 import { colors, spacing, typography } from '../src/theme/tokens';
 import { HistoryEntry, ProductOption, Store } from '../src/types/domain';
-import { formatYen } from '../src/utils/formatters';
+import { formatYen, getDisplayStoreName } from '../src/utils/formatters';
 
 const BADGE_COLORS = ['#FACC15', '#3B82F6', '#F97316', '#22C55E', '#A855F7'];
 
@@ -158,7 +158,7 @@ export default function HistoryScreen() {
               <PillChip
                 key={store.id}
                 active={selectedStoreId === store.id}
-                label={store.name}
+                label={getDisplayStoreName(store)}
                 onPress={() => setSelectedStoreId(store.id)}
               />
             ))}

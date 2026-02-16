@@ -8,7 +8,7 @@
 Source: `src/db/migrations.ts`.
 
 Current migration version:
-- `LATEST_DB_VERSION = 1`.
+- `LATEST_DB_VERSION = 2`.
 
 Flow:
 1. Read `PRAGMA user_version`.
@@ -16,7 +16,7 @@ Flow:
 3. Set `PRAGMA user_version = LATEST_DB_VERSION`.
 4. Skip entirely on web platform.
 
-## Schema (v1)
+## Schema (Current)
 ### `products`
 - `id TEXT PRIMARY KEY`
 - `name TEXT NOT NULL`
@@ -26,6 +26,7 @@ Flow:
 ### `stores`
 - `id TEXT PRIMARY KEY`
 - `name TEXT NOT NULL`
+- `nickname TEXT`
 - `latitude REAL NOT NULL`
 - `longitude REAL NOT NULL`
 - `city_area TEXT NOT NULL`
@@ -63,20 +64,25 @@ Flow:
 
 ### `storesRepo`
 - `getOrCreateStore(input)`:
-- Rejects blank store name/city area.
+- Rejects blank store name/city area/address.
 - Dedupes by case-insensitive name + city area + coordinate tolerance.
+- Upserts optional nickname on existing matched store.
+- `findStoreByIdentity(input)`:
+- Identity lookup for prefill (same dedupe key as `getOrCreateStore`).
 - `listCityAreas()`:
 - Returns grouped areas sorted by count desc, then name asc.
 - `listStores(cityArea?)`:
 - Optional exact city-area filter.
-- Sorts alphabetically by store name.
+- Sorts by display name (nickname fallback to name).
+- `listRecentStores(limit, search?)`:
+- Returns most-recently-used stores (latest `price_entries.created_at`) with search across display/system names.
 
 ### `priceEntriesRepo`
 - `createPriceEntry(input)` inserts immutable observation row.
 - `getLatestStorePricesByProduct(productId, cityArea?)`:
 - One row per store for given product.
 - Row selection ordered by latest observed then latest created.
-- Output sorted by lowest price then store name.
+- Output sorted by lowest price then display store name.
 - `listHistoryEntries(filters)`:
 - Optional product/store filters.
 - Sort descending by observed date, then created date.
@@ -95,6 +101,7 @@ Rules:
 ## Query and Ordering Guarantees
 - Latest-store logic always applies observed-date precedence over created timestamp.
 - History ordering always deterministic by timestamps.
+- Store label projection uses `nickname` when present, otherwise `name`.
 - Product/stores option lists are intentionally stable sorted outputs.
 
 ## Constraints for Future Migrations (Required)

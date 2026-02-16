@@ -4,6 +4,7 @@ import 'leaflet/dist/leaflet.css';
 import {
   ActivityIndicator,
   Animated,
+  Linking,
   Modal,
   Pressable,
   PanResponder,
@@ -22,7 +23,7 @@ import {
   getInitialPlacesApiStatus,
   getPlaceDetails
 } from '../services/placesService';
-import { captureCurrentLocation } from '../services/locationService';
+import { captureCurrentLocation, reverseGeocodeToArea } from '../services/locationService';
 import { useI18n } from '../i18n/useI18n';
 import { colors, radius, shadows, spacing, typography } from '../theme/tokens';
 import { Coordinates, PlaceSelection } from '../types/domain';
@@ -139,7 +140,7 @@ export const PlacePickerModal = ({
     return initialCoordinates;
   }, [coordinates, initialCoordinates]);
   const hasPlaceInfo = useMemo(
-    () => Boolean(suggestedStoreName) || Boolean(addressLine) || (cityArea && cityArea !== notSelectedLabel),
+    () => Boolean(suggestedStoreName) || Boolean(addressLine) || Boolean(cityArea && cityArea !== notSelectedLabel),
     [addressLine, cityArea, notSelectedLabel, suggestedStoreName]
   );
 
@@ -591,15 +592,22 @@ export const PlacePickerModal = ({
   const websiteLabel = formatWebsiteLabel(websiteUri);
 
   const handleConfirmSelection = () => {
+    const normalizedAddressLine = addressLine?.trim() ?? '';
+    if (!normalizedAddressLine) {
+      return;
+    }
+
     onConfirm({
       latitude: coordinates.latitude,
       longitude: coordinates.longitude,
       cityArea,
-      addressLine,
+      addressLine: normalizedAddressLine,
       suggestedStoreName
     });
     onClose();
   };
+
+  const canConfirmSelection = !isResolvingAddress && (addressLine?.trim().length ?? 0) > 0;
 
 
   return (
@@ -780,8 +788,16 @@ export const PlacePickerModal = ({
               </View>
 
               {isResolvingAddress ? <Text style={styles.loaderText}>{t('resolving_address')}</Text> : null}
+              {!isResolvingAddress && !canConfirmSelection ? (
+                <Text style={styles.errorText}>{t('validation_address_required')}</Text>
+              ) : null}
 
-              <PrimaryButton label={t('confirm_location')} onPress={handleConfirmSelection} style={styles.confirmButton} />
+              <PrimaryButton
+                label={t('confirm_location')}
+                onPress={handleConfirmSelection}
+                disabled={!canConfirmSelection}
+                style={styles.confirmButton}
+              />
             </View>
           </Animated.View>
         </View>

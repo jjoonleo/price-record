@@ -16,14 +16,17 @@ Primary responsibility:
 - Create a valid local price observation with required location context.
 
 Key flow:
-1. User enters product/price/store/date.
-2. User opens place picker and confirms map-based selection.
-3. Save validates `hasMapSelection` and `entrySchema`.
+1. User selects a store first from recent list or opens place picker for a new place.
+2. System store name is auto-set from saved store/place payload; optional nickname can be edited.
+3. User enters product/price/date/notes after store selection is complete.
+4. Save validates location/address and form schema.
 4. Repositories resolve product/store identity then insert price entry.
 5. UI resets form and shows saved success feedback.
 
 Required states:
 - Idle editing.
+- Store-selection-first state (product/price/date/notes gated until store selected).
+- Recent stores state (top recent + search + add new place action).
 - Suggestion chips visible when product query has results.
 - Save-in-progress (`Saving...`).
 - Validation/status message region.
@@ -31,8 +34,8 @@ Required states:
 
 Validation boundaries:
 - UI requirement: map selection is mandatory.
-- Schema requirement: non-empty product/store/city area, positive integer price, valid coordinates/date.
-- Repository requirement: product/store data checks still enforce non-empty constraints.
+- Schema requirement: non-empty product/system store name/city area, positive integer price, valid coordinates/date, required address.
+- Repository requirement: product/store data checks still enforce non-empty constraints and nickname upsert rules.
 
 ## Compare Screen (`app/compare.tsx`)
 Primary responsibility:
@@ -83,7 +86,7 @@ Selection contract:
 - `latitude`
 - `longitude`
 - `cityArea`
-- optional `addressLine`
+- required `addressLine`
 - optional `suggestedStoreName`
 
 ## UX State Rules

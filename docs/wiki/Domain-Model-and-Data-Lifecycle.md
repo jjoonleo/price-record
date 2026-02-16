@@ -5,7 +5,7 @@ Source: `src/types/domain.ts`.
 
 ### Core Entities
 - `Product`: `id`, `name`, `normalizedName`, `createdAt`.
-- `Store`: `id`, `name`, `latitude`, `longitude`, `cityArea`, optional `addressLine`, `createdAt`.
+- `Store`: `id`, system `name`, optional user `nickname`, `latitude`, `longitude`, `cityArea`, `addressLine`, `createdAt`.
 - `PriceEntry`: `id`, `productId`, `storeId`, `priceYen`, `observedAt`, `createdAt`.
 
 ### Read Models / UI Models
@@ -16,15 +16,17 @@ Source: `src/types/domain.ts`.
 
 ### Support Types
 - `Coordinates`: latitude/longitude tuple.
-- `PlaceSelection`: map-picked place payload (`cityArea`, optional `addressLine`, optional `suggestedStoreName`).
+- `PlaceSelection`: map-picked place payload (`cityArea`, required `addressLine`, optional `suggestedStoreName`).
 - `StoreComparisonTag`: `BEST | CHEAPEST | CLOSEST`.
 
 ## Entity Lifecycle
 ## 1. Capture Input
 `app/capture.tsx` collects:
+- Store/place selection first (saved stores or new place).
+- System store name (auto-set from saved store or selected place).
+- Optional store nickname.
 - Product name.
 - Price JPY.
-- Store name.
 - Place/map selection (required before save).
 - Observed date.
 
@@ -32,6 +34,7 @@ Validation boundaries:
 - Zod schema enforces non-empty text values.
 - `priceYen` must be positive integer.
 - latitude/longitude range must be valid.
+- system store name and address must exist after location selection.
 - location selection (`hasMapSelection`) is mandatory before schema parse.
 
 ## 2. Normalization and Deduplication
@@ -44,9 +47,11 @@ Validation boundaries:
 
 ### Store identity
 Store dedupe key:
-- Case-insensitive store name (`lower(name)`).
+- Case-insensitive system store name (`lower(name)`).
 - Exact city area string.
 - Coordinate proximity tolerance (`abs(lat diff) < 0.0001` and `abs(lon diff) < 0.0001`).
+
+Nickname is metadata and does not affect identity.
 
 ## 3. Persistence
 Save sequence:
@@ -87,6 +92,7 @@ This is implemented both:
 ## Invariants
 - Every `PriceEntry` references existing `Product` and `Store` (foreign keys in native DB).
 - Product names are normalized consistently before insert.
+- Store display label uses nickname when present; otherwise system name.
 - Store comparisons are deterministic for same inputs.
 - History output always includes user-readable product/store labels (fallback to “Unknown ...” in web missing-reference edge cases).
 

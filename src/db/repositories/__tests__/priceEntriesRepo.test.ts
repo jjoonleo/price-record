@@ -1,4 +1,4 @@
-import { selectLatestByStore } from '../priceEntriesRepo';
+import { resolveStoreName, selectLatestByStore } from '../priceEntriesRepo';
 
 describe('selectLatestByStore', () => {
   it('keeps one row per store and picks newest observedAt first', () => {
@@ -42,5 +42,15 @@ describe('selectLatestByStore', () => {
     ]);
 
     expect(latest[0].createdAt).toBe('2026-02-12T11:02:00.000Z');
+  });
+});
+
+describe('resolveStoreName', () => {
+  it('prefers nickname over system name', () => {
+    expect(resolveStoreName({ name: 'Lawson Marunouchi', nickname: 'Office Lawson' })).toBe('Office Lawson');
+  });
+
+  it('falls back to system name when nickname is empty', () => {
+    expect(resolveStoreName({ name: 'Lawson Marunouchi', nickname: '  ' })).toBe('Lawson Marunouchi');
   });
 });

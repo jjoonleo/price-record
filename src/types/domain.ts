@@ -8,10 +8,11 @@ export type Product = {
 export type Store = {
   id: string;
   name: string;
+  nickname?: string;
   latitude: number;
   longitude: number;
   cityArea: string;
-  addressLine?: string;
+  addressLine: string;
   createdAt: string;
 };
 
@@ -48,7 +49,7 @@ export type PlaceSelection = {
   latitude: number;
   longitude: number;
   cityArea: string;
-  addressLine?: string;
+  addressLine: string;
   suggestedStoreName?: string;
 };
 

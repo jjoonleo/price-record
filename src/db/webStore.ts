@@ -10,10 +10,11 @@ export type WebProduct = {
 export type WebStore = {
   id: string;
   name: string;
+  nickname?: string;
   latitude: number;
   longitude: number;
   cityArea: string;
-  addressLine?: string;
+  addressLine: string;
   createdAt: string;
 };
 
@@ -63,9 +64,17 @@ export const readWebDb = (): WebDb => {
 
   try {
     const parsed = JSON.parse(raw) as Partial<WebDb>;
+    const stores = Array.isArray(parsed.stores)
+      ? parsed.stores.map((store) => ({
+          ...store,
+          nickname: typeof store?.nickname === 'string' ? store.nickname : undefined,
+          addressLine: typeof store?.addressLine === 'string' ? store.addressLine : ''
+        }))
+      : [];
+
     return {
       products: Array.isArray(parsed.products) ? parsed.products : [],
-      stores: Array.isArray(parsed.stores) ? parsed.stores : [],
+      stores,
       priceEntries: Array.isArray(parsed.priceEntries) ? parsed.priceEntries : []
     };
   } catch {
