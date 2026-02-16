@@ -6,7 +6,7 @@ This guide defines manual publishing to GitHub Wiki repositories.
 
 ## Prerequisites
 - GitHub repository exists and wiki is enabled.
-- You have push access to `<owner>/<repo>.wiki.git`.
+- You have push access to `https://github.com/jjoonleo/price-record.wiki.git`.
 - Local source pages are up to date in `docs/wiki/`.
 
 ## Canonical Local Source
@@ -35,15 +35,20 @@ Recommended wiki page names:
 - `Glossary`
 
 ## Manual Publish Workflow
-From a temporary directory:
+Preferred command from the project root:
 ```bash
-git clone https://github.com/<owner>/<repo>.wiki.git
-cd <repo>.wiki
+npm run publish:wiki
+```
+
+Equivalent manual steps from a temporary directory:
+```bash
+git clone https://github.com/jjoonleo/price-record.wiki.git
+cd price-record.wiki
 ```
 
 Copy project wiki pages into the wiki clone:
 ```bash
-cp -R /Users/ejunpark/Development/react\ native/price\ record/docs/wiki/*.md .
+cp -R /path/to/price-record/docs/wiki/*.md .
 ```
 
 Review and publish:
