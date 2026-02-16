@@ -278,14 +278,6 @@ export const PlacePickerModal = ({ visible, initialCoordinates, onClose, onConfi
     onClose();
   };
 
-  const recenterMap = () => {
-    const map = mapRef.current;
-    if (!map) {
-      return;
-    }
-
-    map.setView([coordinates.latitude, coordinates.longitude], map.getZoom() ?? 15, { animate: false });
-  };
 
   return (
     <Modal animationType="slide" presentationStyle="fullScreen" visible={visible}>
