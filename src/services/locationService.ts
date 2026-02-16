@@ -1,4 +1,5 @@
 import * as Location from 'expo-location';
+import { Platform } from 'react-native';
 import { detectLanguage } from '../i18n/translations';
 import { Coordinates } from '../types/domain';
 
@@ -31,6 +32,66 @@ const pickCityArea = (place: Location.LocationGeocodedAddress): string => {
 const buildAddressLine = (place: Location.LocationGeocodedAddress): string | undefined => {
   const parts = [place.street, place.name].filter(Boolean);
   return parts.length > 0 ? parts.join(', ') : undefined;
+};
+
+const toStringIfDefined = (value: unknown): string | undefined => {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+};
+
+const pickCityAreaFromNominatim = (address: unknown): string | undefined => {
+  if (!address || typeof address !== 'object' || address === null) {
+    return undefined;
+  }
+
+  const typedAddress = address as Record<string, unknown>;
+  return (
+    toStringIfDefined(typedAddress.neighbourhood) ||
+    toStringIfDefined(typedAddress.suburb) ||
+    toStringIfDefined(typedAddress.city) ||
+    toStringIfDefined(typedAddress.town) ||
+    toStringIfDefined(typedAddress.village) ||
+    toStringIfDefined(typedAddress.hamlet) ||
+    toStringIfDefined(typedAddress.city_district) ||
+    toStringIfDefined(typedAddress.county) ||
+    toStringIfDefined(typedAddress.state) ||
+    'Unknown area'
+  );
+};
+
+const reverseGeocodeFallback = async (
+  coordinates: Coordinates
+): Promise<{ cityArea: string; addressLine?: string }> => {
+  const query = new URLSearchParams({
+    format: 'jsonv2',
+    lat: String(coordinates.latitude),
+    lon: String(coordinates.longitude),
+    zoom: '18',
+    addressdetails: '1'
+  });
+
+  const response = await fetch(`https://nominatim.openstreetmap.org/reverse?${query.toString()}`, {
+    headers: {
+      Accept: 'application/json'
+    }
+  });
+
+  if (!response.ok) {
+    return {
+      cityArea: 'Unknown area'
+    };
+  }
+
+  const body = await response.json();
+  const cityArea = pickCityAreaFromNominatim(body?.address);
+
+  return {
+    cityArea,
+    addressLine: body?.display_name ? toStringIfDefined(body.display_name) : undefined
+  };
 };
 
 const buildGrantedResult = async (coordinates: Coordinates): Promise<LocationCaptureResult> => {
@@ -78,6 +139,16 @@ const tryBrowserGeolocation = async (): Promise<LocationCaptureResult | null> =>
 export const reverseGeocodeToArea = async (
   coordinates: Coordinates
 ): Promise<{ cityArea: string; addressLine?: string }> => {
+  if (Platform.OS === 'web') {
+    try {
+      return await reverseGeocodeFallback(coordinates);
+    } catch {
+      return {
+        cityArea: 'Unknown area'
+      };
+    }
+  }
+
   const geocode = await Location.reverseGeocodeAsync(coordinates);
   const firstPlace = geocode[0];
 

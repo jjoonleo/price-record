@@ -21,6 +21,7 @@ import { PrimaryButton } from '../src/components/ui/PrimaryButton';
 import { createPriceEntry } from '../src/db/repositories/priceEntriesRepo';
 import { getOrCreateProduct, listProductOptions } from '../src/db/repositories/productsRepo';
 import { getOrCreateStore } from '../src/db/repositories/storesRepo';
+import { captureCurrentLocation } from '../src/services/locationService';
 import { useI18n } from '../src/i18n/useI18n';
 import { colors, radius, shadows, spacing, typography } from '../src/theme/tokens';
 import { Coordinates, PlaceSelection } from '../src/types/domain';
@@ -73,6 +74,7 @@ export default function CaptureScreen() {
   const [productSuggestions, setProductSuggestions] = useState<string[]>([]);
   const [storeNameTouched, setStoreNameTouched] = useState(false);
   const [lastAutoFilledStoreName, setLastAutoFilledStoreName] = useState<string | null>(null);
+  const [initialPickerCoordinates, setInitialPickerCoordinates] = useState<Coordinates>(DEFAULT_COORDINATES);
 
   const locale = language === 'ko' ? 'ko-KR' : 'en-US';
   const frameWidth = useMemo(() => Math.min(Math.max(width - spacing.md * 2, 0), 448), [width]);
@@ -115,12 +117,28 @@ export default function CaptureScreen() {
     setStatusMessage(nextStatus);
   };
 
-  const getCurrentCoordinates = (): Coordinates => ({
-    latitude: Number.parseFloat(latitude) || DEFAULT_COORDINATES.latitude,
-    longitude: Number.parseFloat(longitude) || DEFAULT_COORDINATES.longitude
-  });
+  const openPlacePicker = async () => {
+    if (hasMapSelection) {
+      setIsPlacePickerVisible(true);
+      return;
+    }
+
+    let nextCoordinates = DEFAULT_COORDINATES;
+    try {
+      const locationResult = await captureCurrentLocation();
+      if (locationResult.status === 'granted') {
+        nextCoordinates = locationResult.coordinates;
+      }
+    } catch {
+      // keep fallback coordinates
+    }
+
+    setInitialPickerCoordinates(nextCoordinates);
+    setIsPlacePickerVisible(true);
+  };
 
   const handleApplyPlaceSelection = (selection: PlaceSelection) => {
+    setInitialPickerCoordinates({ latitude: selection.latitude, longitude: selection.longitude });
     setHasMapSelection(true);
     setSelectedPlaceName(selection.suggestedStoreName ?? '');
     setLatitude(selection.latitude.toFixed(6));
@@ -334,7 +352,9 @@ export default function CaptureScreen() {
                       />
                       <Pressable
                         accessibilityRole="button"
-                        onPress={() => setIsPlacePickerVisible(true)}
+                        onPress={() => {
+                          void openPlacePicker();
+                        }}
                         style={({ pressed }) => [styles.mapEntryButton, pressed && styles.pressed]}
                       >
                         <MaterialCommunityIcons color={colors.primary} name="map-marker-outline" size={18} />
@@ -346,7 +366,9 @@ export default function CaptureScreen() {
 
                   <Pressable
                     accessibilityRole="button"
-                    onPress={() => setIsPlacePickerVisible(true)}
+                    onPress={() => {
+                      void openPlacePicker();
+                    }}
                     style={({ pressed }) => [styles.locationSummaryRow, pressed && styles.pressed]}
                   >
                     <View style={styles.locationBadge}>
@@ -408,7 +430,19 @@ export default function CaptureScreen() {
 
       <PlacePickerModal
         visible={isPlacePickerVisible}
-        initialCoordinates={getCurrentCoordinates()}
+        initialCoordinates={initialPickerCoordinates}
+        initialPlaceSelection={
+          hasMapSelection
+            ? {
+                latitude: Number.parseFloat(latitude) || DEFAULT_COORDINATES.latitude,
+                longitude: Number.parseFloat(longitude) || DEFAULT_COORDINATES.longitude,
+                cityArea: cityArea || t('not_selected'),
+                addressLine: addressLine || undefined,
+                suggestedStoreName: selectedPlaceName || undefined
+              }
+            : undefined
+        }
+        showPlaceInfoInitially={hasMapSelection}
         onClose={() => setIsPlacePickerVisible(false)}
         onConfirm={handleApplyPlaceSelection}
       />

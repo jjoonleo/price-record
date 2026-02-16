@@ -22,7 +22,7 @@ import {
   getInitialPlacesApiStatus,
   getPlaceDetails
 } from '../services/placesService';
-import { captureCurrentLocation, reverseGeocodeToArea } from '../services/locationService';
+import { captureCurrentLocation } from '../services/locationService';
 import { useI18n } from '../i18n/useI18n';
 import { colors, radius, shadows, spacing, typography } from '../theme/tokens';
 import { Coordinates, PlaceSelection } from '../types/domain';
@@ -30,6 +30,8 @@ import { Coordinates, PlaceSelection } from '../types/domain';
 type PlacePickerModalProps = {
   visible: boolean;
   initialCoordinates: Coordinates;
+  initialPlaceSelection?: PlaceSelection;
+  showPlaceInfoInitially?: boolean;
   onClose: () => void;
   onConfirm: (selection: PlaceSelection) => void;
 };
@@ -58,12 +60,41 @@ const buildFallbackMessage = (status: PlacesApiStatus, t: ReturnType<typeof useI
   return t('search_unavailable');
 };
 
-export const PlacePickerModal = ({ visible, initialCoordinates, onClose, onConfirm }: PlacePickerModalProps) => {
+const parseCityAreaFromAddress = (address?: string): string | undefined => {
+  if (!address) {
+    return undefined;
+  }
+
+  const parts = address
+    .split(',')
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  if (parts.length === 0) {
+    return undefined;
+  }
+
+  if (parts.length === 1) {
+    return parts[0];
+  }
+
+  return parts[parts.length - 2];
+};
+
+export const PlacePickerModal = ({
+  visible,
+  initialCoordinates,
+  initialPlaceSelection,
+  showPlaceInfoInitially = false,
+  onClose,
+  onConfirm
+}: PlacePickerModalProps) => {
   const { t } = useI18n();
   const notSelectedLabel = t('not_selected');
 
   const [apiStatus, setApiStatus] = useState<PlacesApiStatus>({ mode: 'pin-only', reason: 'missing-key' });
   const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [coordinates, setCoordinates] = useState<Coordinates>(initialCoordinates);
   const [cityArea, setCityArea] = useState(notSelectedLabel);
   const [addressLine, setAddressLine] = useState<string | undefined>();
@@ -78,11 +109,38 @@ export const PlacePickerModal = ({ visible, initialCoordinates, onClose, onConfi
   const [isPlaceInfoVisible, setIsPlaceInfoVisible] = useState(false);
   const [sheetHeight, setSheetHeight] = useState(0);
   const sheetTranslateY = useRef(new Animated.Value(420)).current;
+  const suppressSearchBlurRef = useRef(false);
+  const didHydrateFromInitialSelectionRef = useRef(false);
+  const showPlaceInfoSheetRef = useRef<() => void>(() => {});
+  const hidePlaceInfoSheetRef = useRef<() => void>(() => {});
+  const mapTapStateRef = useRef({ isVisible: false, hasPlaceInfo: false });
+  const initialSelectionQuery = useMemo(
+    () =>
+      [initialPlaceSelection?.suggestedStoreName, initialPlaceSelection?.addressLine, initialPlaceSelection?.cityArea]
+        .filter((value): value is string => Boolean(value))
+        .join(', '),
+    [initialPlaceSelection]
+  );
 
   const mapNodeRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<any | null>(null);
   const markerRef = useRef<any | null>(null);
+  const currentLocationMarkerRef = useRef<any | null>(null);
+  const leafletRef = useRef<any | null>(null);
   const hasOpenedRef = useRef(false);
+  const skipNextCoordinateSyncRef = useRef(false);
+  const [currentLocationCoordinates, setCurrentLocationCoordinates] = useState<Coordinates | null>(null);
+  const activeCoordinates = useMemo(() => {
+    if (hasOpenedRef.current) {
+      return coordinates;
+    }
+
+    return initialCoordinates;
+  }, [coordinates, initialCoordinates]);
+  const hasPlaceInfo = useMemo(
+    () => Boolean(suggestedStoreName) || Boolean(addressLine) || (cityArea && cityArea !== notSelectedLabel),
+    [addressLine, cityArea, notSelectedLabel, suggestedStoreName]
+  );
 
   const resolveAddress = useCallback(
     async (nextCoordinates: Coordinates) => {
@@ -142,6 +200,18 @@ export const PlacePickerModal = ({ visible, initialCoordinates, onClose, onConfi
     },
     [animateSheet]
   );
+
+  useEffect(() => {
+    showPlaceInfoSheetRef.current = showPlaceInfoSheet;
+    hidePlaceInfoSheetRef.current = hidePlaceInfoSheet;
+  }, [hidePlaceInfoSheet, showPlaceInfoSheet]);
+
+  useEffect(() => {
+    mapTapStateRef.current = {
+      isVisible: isPlaceInfoVisible,
+      hasPlaceInfo
+    };
+  }, [hasPlaceInfo, isPlaceInfoVisible]);
 
   const handleSheetLayout = useCallback(
     (event: { nativeEvent: { layout: { height: number } } }) => {
@@ -206,6 +276,8 @@ export const PlacePickerModal = ({ visible, initialCoordinates, onClose, onConfi
   useEffect(() => {
     if (!visible) {
       hasOpenedRef.current = false;
+      skipNextCoordinateSyncRef.current = false;
+      didHydrateFromInitialSelectionRef.current = false;
       return;
     }
 
@@ -214,35 +286,58 @@ export const PlacePickerModal = ({ visible, initialCoordinates, onClose, onConfi
     }
 
     hasOpenedRef.current = true;
+    skipNextCoordinateSyncRef.current = true;
 
     setApiStatus(getInitialPlacesApiStatus());
-    setSearchQuery('');
     setCoordinates(initialCoordinates);
-    setCityArea(notSelectedLabel);
-    setAddressLine(undefined);
-    setSuggestedStoreName(undefined);
+    setCityArea(initialPlaceSelection?.cityArea ?? notSelectedLabel);
+    setAddressLine(initialPlaceSelection?.addressLine);
+    setSuggestedStoreName(initialPlaceSelection?.suggestedStoreName);
+    setSearchQuery(initialSelectionQuery);
     setWebsiteUri(undefined);
     setLocationStatusMessage(null);
     setIsLocatingCurrent(false);
     setSelectedSuggestionId(null);
+    setIsSearchFocused(false);
+    suppressSearchBlurRef.current = false;
     setMapError(null);
-    hidePlaceInfoSheet(true);
     setIsInitializingLocation(true);
+    didHydrateFromInitialSelectionRef.current = false;
+    setCurrentLocationCoordinates(null);
 
     void (async () => {
-      const locationResult = await captureCurrentLocation();
-      if (locationResult.status === 'granted') {
-        setCoordinates(locationResult.coordinates);
-        setCityArea(locationResult.cityArea);
-        setAddressLine(locationResult.addressLine);
-        setSuggestedStoreName(undefined);
-        setWebsiteUri(undefined);
+      const currentResult = await captureCurrentLocation();
+      if (currentResult.status === 'granted') {
+        setCurrentLocationCoordinates(currentResult.coordinates);
+      }
+      if (initialPlaceSelection) {
+        if (!initialPlaceSelection.addressLine || !initialPlaceSelection.cityArea) {
+          await resolveAddress(initialCoordinates);
+        }
       } else {
-        await resolveAddress(initialCoordinates);
+        setCityArea(notSelectedLabel);
+        setAddressLine(undefined);
+        setSuggestedStoreName(undefined);
+        setSearchQuery('');
+      }
+      if (showPlaceInfoInitially) {
+        showPlaceInfoSheet();
+      } else {
+        hidePlaceInfoSheet(true);
       }
       setIsInitializingLocation(false);
     })();
-  }, [hidePlaceInfoSheet, initialCoordinates, resolveAddress, visible]);
+  }, [
+    showPlaceInfoInitially,
+    initialSelectionQuery,
+    initialPlaceSelection,
+    hidePlaceInfoSheet,
+    initialCoordinates,
+    resolveAddress,
+    showPlaceInfoSheet,
+    visible,
+    notSelectedLabel
+  ]);
 
   useEffect(() => {
     if (!visible || !mapNodeRef.current || typeof window === 'undefined') {
@@ -258,18 +353,19 @@ export const PlacePickerModal = ({ visible, initialCoordinates, onClose, onConfi
         if (disposed || !mapNodeRef.current) {
           return;
         }
+        leafletRef.current = L;
 
         const map = L.map(mapNodeRef.current, {
           zoomControl: false,
           attributionControl: false
-        }).setView([coordinates.latitude, coordinates.longitude], 15);
+        }).setView([activeCoordinates.latitude, activeCoordinates.longitude], 15);
 
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
           maxZoom: 19,
           attribution: '&copy; OpenStreetMap contributors'
         }).addTo(map);
 
-        const marker = L.marker([coordinates.latitude, coordinates.longitude], {
+        const marker = L.marker([activeCoordinates.latitude, activeCoordinates.longitude], {
           draggable: false,
           icon: L.divIcon({
             className: 'place-picker-pin',
@@ -279,13 +375,32 @@ export const PlacePickerModal = ({ visible, initialCoordinates, onClose, onConfi
               '<div style="display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:999px;background:#FF3B30;box-shadow:0 8px 16px rgba(0,0,0,0.2)"><span style="width:10px;height:10px;border-radius:999px;background:#fff"></span></div>'
           })
         }).addTo(map);
+        marker.setOpacity(hasPlaceInfo ? 1 : 0);
 
         map.on('click', (_event: any) => {
-          hidePlaceInfoSheet();
+          const { isVisible, hasPlaceInfo } = mapTapStateRef.current;
+          if (isVisible) {
+            hidePlaceInfoSheetRef.current();
+          } else if (hasPlaceInfo) {
+            showPlaceInfoSheetRef.current();
+          }
+          setIsSearchFocused(false);
         });
 
         mapRef.current = map;
         markerRef.current = marker;
+        if (currentLocationCoordinates) {
+          currentLocationMarkerRef.current = L.circleMarker(
+            [currentLocationCoordinates.latitude, currentLocationCoordinates.longitude],
+            {
+              radius: 6,
+              color: '#1D4ED8',
+              weight: 2,
+              fillColor: '#1D4ED8',
+              fillOpacity: 1
+            }
+          ).addTo(map);
+        }
 
         window.requestAnimationFrame(() => {
           map.invalidateSize();
@@ -300,6 +415,7 @@ export const PlacePickerModal = ({ visible, initialCoordinates, onClose, onConfi
     return () => {
       disposed = true;
       markerRef.current = null;
+      currentLocationMarkerRef.current = null;
       if (mapRef.current) {
         mapRef.current.remove();
         mapRef.current = null;
@@ -319,10 +435,61 @@ export const PlacePickerModal = ({ visible, initialCoordinates, onClose, onConfi
       return;
     }
 
+    if (skipNextCoordinateSyncRef.current) {
+      skipNextCoordinateSyncRef.current = false;
+      return;
+    }
+
     marker.setLatLng([coordinates.latitude, coordinates.longitude]);
+    marker.setOpacity(hasPlaceInfo ? 1 : 0);
     map.invalidateSize();
     map.setView([coordinates.latitude, coordinates.longitude], map.getZoom() ?? 15, { animate: false });
-  }, [coordinates, visible]);
+  }, [coordinates, hasPlaceInfo, visible]);
+
+  useEffect(() => {
+    if (!visible) {
+      return;
+    }
+
+    const marker = markerRef.current;
+    if (!marker) {
+      return;
+    }
+
+    marker.setOpacity(hasPlaceInfo ? 1 : 0);
+  }, [hasPlaceInfo, visible]);
+
+  useEffect(() => {
+    if (!visible) {
+      return;
+    }
+
+    const map = mapRef.current;
+    const L = leafletRef.current;
+
+    if (!map || !L || !currentLocationCoordinates) {
+      return;
+    }
+
+    if (currentLocationMarkerRef.current) {
+      currentLocationMarkerRef.current.setLatLng([
+        currentLocationCoordinates.latitude,
+        currentLocationCoordinates.longitude
+      ]);
+      return;
+    }
+
+    currentLocationMarkerRef.current = L.circleMarker(
+      [currentLocationCoordinates.latitude, currentLocationCoordinates.longitude],
+      {
+        radius: 6,
+        color: '#1D4ED8',
+        weight: 2,
+        fillColor: '#1D4ED8',
+        fillOpacity: 1
+      }
+    ).addTo(map);
+  }, [currentLocationCoordinates, visible]);
 
   const onSearchFailure = useCallback((reason: 'request-failed' | 'quota-exceeded' | 'request-denied') => {
     if (reason === 'request-failed') return;
@@ -334,16 +501,23 @@ export const PlacePickerModal = ({ visible, initialCoordinates, onClose, onConfi
 
   const handleSuggestionSelect = async (suggestion: PlaceSuggestion) => {
     try {
+      setIsSearchFocused(false);
+      suppressSearchBlurRef.current = false;
       setSelectedSuggestionId(suggestion.placeId);
       const details = await getPlaceDetails(suggestion.placeId);
       const nextCoordinates = { latitude: details.latitude, longitude: details.longitude };
+      skipNextCoordinateSyncRef.current = false;
       setCoordinates(nextCoordinates);
       setSuggestedStoreName(details.name || suggestion.primaryText);
       setWebsiteUri(details.websiteUri);
-      const reverse = await reverseGeocodeToArea(nextCoordinates);
-      setCityArea(reverse.cityArea);
-      setAddressLine(details.address || reverse.addressLine);
+      const addressLineCandidate = details.address;
+      setCityArea(parseCityAreaFromAddress(addressLineCandidate) ?? notSelectedLabel);
+      setAddressLine(addressLineCandidate);
       setSearchQuery(suggestion.primaryText);
+      const map = mapRef.current;
+      if (map) {
+        map.setView([nextCoordinates.latitude, nextCoordinates.longitude], map.getZoom() ?? 15, { animate: true });
+      }
     } catch {
       setSuggestedStoreName(suggestion.primaryText);
       setWebsiteUri(undefined);
@@ -354,16 +528,49 @@ export const PlacePickerModal = ({ visible, initialCoordinates, onClose, onConfi
     }
   };
 
+  useEffect(() => {
+    if (!visible || !showPlaceInfoInitially || didHydrateFromInitialSelectionRef.current) {
+      return;
+    }
+
+    if (!initialPlaceSelection || isSearchLoading || suggestions.length === 0) {
+      return;
+    }
+
+    if (!initialSelectionQuery || searchQuery !== initialSelectionQuery) {
+      return;
+    }
+
+    const topSuggestion = suggestions[0];
+    if (!topSuggestion) {
+      return;
+    }
+
+    didHydrateFromInitialSelectionRef.current = true;
+    void handleSuggestionSelect(topSuggestion);
+  }, [
+    handleSuggestionSelect,
+    initialPlaceSelection,
+    isSearchLoading,
+    showPlaceInfoInitially,
+    initialSelectionQuery,
+    searchQuery,
+    suggestions,
+    visible
+  ]);
+
   const handleUseCurrentLocation = async () => {
     setIsLocatingCurrent(true);
     setLocationStatusMessage(null);
     const result = await captureCurrentLocation();
     if (result.status === 'granted') {
-      setCoordinates(result.coordinates);
-      setCityArea(result.cityArea);
-      setAddressLine(result.addressLine);
-      setSuggestedStoreName(undefined);
-      setWebsiteUri(undefined);
+      const map = mapRef.current;
+      setCurrentLocationCoordinates(result.coordinates);
+      if (map) {
+        map.setView([result.coordinates.latitude, result.coordinates.longitude], map.getZoom() ?? 15, {
+          animate: true
+        });
+      }
     } else {
       setLocationStatusMessage(result.message);
     }
@@ -408,6 +615,14 @@ export const PlacePickerModal = ({ visible, initialCoordinates, onClose, onConfi
               <TextInput
                 editable={apiStatus.mode === 'search-enabled'}
                 onChangeText={setSearchQuery}
+                onBlur={() => {
+                  if (suppressSearchBlurRef.current) {
+                    suppressSearchBlurRef.current = false;
+                    return;
+                  }
+                  setIsSearchFocused(false);
+                }}
+                onFocus={() => setIsSearchFocused(true)}
                 placeholder={t('search_placeholder_short')}
                 placeholderTextColor={colors.textSecondary}
                 style={styles.searchInput}
@@ -438,14 +653,21 @@ export const PlacePickerModal = ({ visible, initialCoordinates, onClose, onConfi
             </Pressable>
           </Animated.View>
 
-          {apiStatus.mode === 'search-enabled' && (isSearchLoading || suggestions.length > 0) ? (
+          {apiStatus.mode === 'search-enabled' && isSearchFocused && (isSearchLoading || suggestions.length > 0) ? (
             <View style={styles.suggestionPanel}>
               {isSearchLoading ? (
                 <View style={styles.loaderRow}><ActivityIndicator color={colors.primary} size="small" /><Text style={styles.loaderText}>{t('searching_places')}</Text></View>
               ) : (
                 <ScrollView keyboardShouldPersistTaps="handled">
                   {suggestions.map((suggestion) => (
-                    <Pressable key={suggestion.placeId} onPress={() => void handleSuggestionSelect(suggestion)} style={styles.suggestionItem}>
+                    <Pressable
+                      key={suggestion.placeId}
+                      onPressIn={() => {
+                        suppressSearchBlurRef.current = true;
+                      }}
+                      onPress={() => void handleSuggestionSelect(suggestion)}
+                      style={styles.suggestionItem}
+                    >
                       <Text style={styles.suggestionPrimary}>{suggestion.primaryText}</Text>
                       {suggestion.secondaryText ? <Text style={styles.suggestionSecondary}>{suggestion.secondaryText}</Text> : null}
                       {selectedSuggestionId === suggestion.placeId ? <Text style={styles.loaderText}>{t('applying')}</Text> : null}

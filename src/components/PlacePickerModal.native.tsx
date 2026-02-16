@@ -3,8 +3,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
+  Dimensions,
   Linking,
   Modal,
+  Keyboard,
   Pressable,
   PanResponder,
   StyleSheet,
@@ -31,6 +33,8 @@ import { Coordinates, PlaceSelection } from '../types/domain';
 type PlacePickerModalProps = {
   visible: boolean;
   initialCoordinates: Coordinates;
+  initialPlaceSelection?: PlaceSelection;
+  showPlaceInfoInitially?: boolean;
   onClose: () => void;
   onConfirm: (selection: PlaceSelection) => void;
 };
@@ -92,6 +96,8 @@ const buildFallbackMessage = (status: PlacesApiStatus, t: ReturnType<typeof useI
 export const PlacePickerModal = ({
   visible,
   initialCoordinates,
+  initialPlaceSelection,
+  showPlaceInfoInitially = false,
   onClose,
   onConfirm
 }: PlacePickerModalProps) => {
@@ -100,6 +106,7 @@ export const PlacePickerModal = ({
   const insets = useSafeAreaInsets();
   const [apiStatus, setApiStatus] = useState<PlacesApiStatus>({ mode: 'pin-only', reason: 'missing-key' });
   const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [coordinates, setCoordinates] = useState<Coordinates>(initialCoordinates);
   const [cityArea, setCityArea] = useState(notSelectedLabel);
   const [addressLine, setAddressLine] = useState<string | undefined>();
@@ -114,8 +121,36 @@ export const PlacePickerModal = ({
   const [isPlaceInfoVisible, setIsPlaceInfoVisible] = useState(false);
   const [sheetHeight, setSheetHeight] = useState(0);
   const [userTrackingMode, setUserTrackingMode] = useState<number>(USER_TRACKING_MODES.none);
-  const sheetTranslateY = useRef(new Animated.Value(420)).current;
+  const [currentLocationCoordinates, setCurrentLocationCoordinates] = useState<Coordinates | null>(null);
+  const sheetTranslateY = useRef(new Animated.Value(Dimensions.get('window').height)).current;
+  const suppressSearchBlurRef = useRef(false);
   const hasOpenedRef = useRef(false);
+  const didHydrateFromInitialSelectionRef = useRef(false);
+  const activeCoordinates = useMemo(() => {
+    if (hasOpenedRef.current) {
+      return coordinates;
+    }
+
+    return initialCoordinates;
+  }, [coordinates, initialCoordinates]);
+  const activeMapRegion = useMemo(() => {
+    if (hasOpenedRef.current) {
+      return mapRegion;
+    }
+
+    return regionFromCoordinates(initialCoordinates);
+  }, [mapRegion, initialCoordinates]);
+  const hasPlaceInfo = useMemo(
+    () => Boolean(suggestedStoreName) || Boolean(addressLine) || (cityArea && cityArea !== notSelectedLabel),
+    [addressLine, cityArea, notSelectedLabel, suggestedStoreName]
+  );
+  const initialSelectionQuery = useMemo(
+    () =>
+      [initialPlaceSelection?.suggestedStoreName, initialPlaceSelection?.addressLine, initialPlaceSelection?.cityArea]
+        .filter((value): value is string => Boolean(value))
+        .join(', '),
+    [initialPlaceSelection]
+  );
 
   const resolveAddress = useCallback(
     async (nextCoordinates: Coordinates) => {
@@ -246,6 +281,7 @@ export const PlacePickerModal = ({
   useEffect(() => {
     if (!visible) {
       hasOpenedRef.current = false;
+      didHydrateFromInitialSelectionRef.current = false;
       return;
     }
 
@@ -257,34 +293,53 @@ export const PlacePickerModal = ({
 
     const initStatus = getInitialPlacesApiStatus();
     setApiStatus(initStatus);
-    setSearchQuery('');
     setCoordinates(initialCoordinates);
     setMapRegion(regionFromCoordinates(initialCoordinates));
-    setCityArea(notSelectedLabel);
-    setAddressLine(undefined);
-    setSuggestedStoreName(undefined);
+    setCityArea(initialPlaceSelection?.cityArea ?? notSelectedLabel);
+    setAddressLine(initialPlaceSelection?.addressLine);
+    setSuggestedStoreName(initialPlaceSelection?.suggestedStoreName);
+    setSearchQuery(initialSelectionQuery);
     setWebsiteUri(undefined);
     setLocationStatusMessage(null);
     setIsLocatingCurrent(false);
     setSelectedSuggestionId(null);
-    hidePlaceInfoSheet(true);
+    setIsSearchFocused(false);
+    suppressSearchBlurRef.current = false;
     clearTrackingMode();
+    setCurrentLocationCoordinates(null);
     setIsInitializingLocation(true);
+    didHydrateFromInitialSelectionRef.current = false;
 
     void (async () => {
-      const locationResult = await captureCurrentLocation();
-      if (locationResult.status === 'granted') {
-        const currentCoordinates = locationResult.coordinates;
-        setCoordinates(currentCoordinates);
-        setMapRegion(regionFromCoordinates(currentCoordinates));
-        setCityArea(locationResult.cityArea);
-        setAddressLine(locationResult.addressLine);
+      if (initialPlaceSelection) {
+        if (!initialPlaceSelection.addressLine || !initialPlaceSelection.cityArea) {
+          await resolveAddress(initialCoordinates);
+        }
       } else {
-        await resolveAddress(initialCoordinates);
+        setCityArea(notSelectedLabel);
+        setAddressLine(undefined);
+        setSuggestedStoreName(undefined);
+        setSearchQuery('');
+      }
+      if (showPlaceInfoInitially) {
+        showPlaceInfoSheet();
+      } else {
+        hidePlaceInfoSheet(true);
       }
       setIsInitializingLocation(false);
     })();
-  }, [clearTrackingMode, hidePlaceInfoSheet, initialCoordinates, resolveAddress, visible]);
+  }, [
+    clearTrackingMode,
+    showPlaceInfoInitially,
+    initialSelectionQuery,
+    initialPlaceSelection,
+    hidePlaceInfoSheet,
+    initialCoordinates,
+    resolveAddress,
+    showPlaceInfoSheet,
+    visible,
+    notSelectedLabel
+  ]);
 
   const onSearchFailure = useCallback((reason: 'request-failed' | 'quota-exceeded' | 'request-denied') => {
     if (reason === 'request-failed') {
@@ -299,6 +354,9 @@ export const PlacePickerModal = ({
 
   const handleSuggestionSelect = async (suggestion: PlaceSuggestion) => {
     try {
+      Keyboard.dismiss();
+      setIsSearchFocused(false);
+      suppressSearchBlurRef.current = false;
       setSelectedSuggestionId(suggestion.placeId);
       const details = await getPlaceDetails(suggestion.placeId);
       const nextCoordinates = {
@@ -325,9 +383,46 @@ export const PlacePickerModal = ({
     }
   };
 
+  useEffect(() => {
+    if (!visible || !showPlaceInfoInitially || didHydrateFromInitialSelectionRef.current) {
+      return;
+    }
+
+    if (!initialPlaceSelection || isSearchLoading || suggestions.length === 0) {
+      return;
+    }
+
+    if (!initialSelectionQuery || searchQuery !== initialSelectionQuery) {
+      return;
+    }
+
+    const topSuggestion = suggestions[0];
+    if (!topSuggestion) {
+      return;
+    }
+
+    didHydrateFromInitialSelectionRef.current = true;
+    void handleSuggestionSelect(topSuggestion);
+  }, [
+    handleSuggestionSelect,
+    initialPlaceSelection,
+    isSearchLoading,
+    showPlaceInfoInitially,
+    initialSelectionQuery,
+    searchQuery,
+    suggestions,
+    visible
+  ]);
+
   const handleMapPress = (_event: MapPressEvent) => {
-    hidePlaceInfoSheet();
+    if (isPlaceInfoVisible) {
+      hidePlaceInfoSheet();
+    } else if (hasPlaceInfo) {
+      showPlaceInfoSheet();
+    }
     clearTrackingMode();
+    setIsSearchFocused(false);
+    Keyboard.dismiss();
   };
 
   const handleConfirmSelection = () => {
@@ -350,11 +445,7 @@ export const PlacePickerModal = ({
         { latitude: mapRegion.latitude, longitude: mapRegion.longitude },
         result.coordinates
       );
-      setCoordinates(result.coordinates);
-      setCityArea(result.cityArea);
-      setAddressLine(result.addressLine);
-      setSuggestedStoreName(undefined);
-      setWebsiteUri(undefined);
+      setCurrentLocationCoordinates(result.coordinates);
 
       if (isMapCenteredAtCurrentLocation && userTrackingMode === USER_TRACKING_MODES.follow) {
         setUserTrackingMode(USER_TRACKING_MODES.followWithHeading);
@@ -378,9 +469,6 @@ export const PlacePickerModal = ({
             <Text style={styles.headerActionText}>{t('cancel')}</Text>
           </Pressable>
           <Text style={styles.headerTitle}>{t('pick_place')}</Text>
-          <Pressable onPress={handleConfirmSelection} style={styles.headerActionRight}>
-            <Text style={styles.headerConfirmText}>{t('confirm')}</Text>
-          </Pressable>
         </View>
 
         <View style={styles.mapShell}>
@@ -393,16 +481,23 @@ export const PlacePickerModal = ({
             <MapView
               onPress={handleMapPress}
               onPanDrag={clearTrackingMode}
-              region={mapRegion}
+              region={activeMapRegion}
               style={styles.map}
               onRegionChangeComplete={(region: Region) => setMapRegion(region)}
               userTrackingMode={userTrackingMode as never}
               showsUserLocation
             >
-              <Marker
-                coordinate={coordinates}
-                pinColor={colors.mapPin}
-              />
+              {currentLocationCoordinates ? (
+                <Marker coordinate={currentLocationCoordinates} anchor={{ x: 0.5, y: 0.5 }}>
+                  <View style={styles.currentLocationDot} />
+                </Marker>
+              ) : null}
+              {hasPlaceInfo ? (
+                <Marker
+                  coordinate={activeCoordinates}
+                  pinColor={colors.mapPin}
+                />
+              ) : null}
             </MapView>
           )}
 
@@ -412,6 +507,14 @@ export const PlacePickerModal = ({
               <TextInput
                 editable={apiStatus.mode === 'search-enabled'}
                 onChangeText={setSearchQuery}
+                onBlur={() => {
+                  if (suppressSearchBlurRef.current) {
+                    suppressSearchBlurRef.current = false;
+                    return;
+                  }
+                  setIsSearchFocused(false);
+                }}
+                onFocus={() => setIsSearchFocused(true)}
                 placeholder={t('search_placeholder_short')}
                 placeholderTextColor={colors.textSecondary}
                 style={styles.searchInput}
@@ -451,7 +554,7 @@ export const PlacePickerModal = ({
             </Pressable>
           </Animated.View>
 
-          {apiStatus.mode === 'search-enabled' && (isSearchLoading || suggestions.length > 0) ? (
+          {apiStatus.mode === 'search-enabled' && isSearchFocused && (isSearchLoading || suggestions.length > 0) ? (
             <View style={styles.suggestionPanel}>
               {isSearchLoading ? (
                 <View style={styles.loaderRow}>
@@ -463,6 +566,9 @@ export const PlacePickerModal = ({
                   {suggestions.map((suggestion) => (
                     <Pressable
                       key={suggestion.placeId}
+                      onPressIn={() => {
+                        suppressSearchBlurRef.current = true;
+                      }}
                       onPress={() => void handleSuggestionSelect(suggestion)}
                       style={styles.suggestionItem}
                     >
@@ -671,6 +777,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: 44,
     ...shadows.soft
+  },
+  currentLocationDot: {
+    backgroundColor: '#1D4ED8',
+    borderColor: colors.white,
+    borderRadius: 6,
+    borderWidth: 2,
+    height: 12,
+    width: 12
   },
   suggestionPanel: {
     backgroundColor: colors.white,
