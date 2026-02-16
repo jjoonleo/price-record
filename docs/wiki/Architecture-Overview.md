@@ -22,10 +22,18 @@ The app uses a local-first, layered client architecture:
 - Compose components and call repositories/services.
 - Hold screen-local UI state.
 - Own view states (loading, empty, error, success).
+- Keep route wrappers thin when feature-level controller hooks exist.
 
 ### Components (`src/components/*`)
 - Render reusable UI blocks (`FilterChip`, `StoreScoreCard`, `PriceBarChart`).
 - Provide platform-specific variants where needed (`*.native.tsx`, `*.web.tsx`).
+- Feature micro-component groups should live under `src/components/<feature>/` with semantic section files.
+- Web-only anatomy blueprints should be added as `LayoutBlueprint.web.tsx` style files to aid onboarding/review.
+
+### Feature Controllers (`src/features/*`)
+- Own feature-local orchestration and view-model derivation.
+- Keep parsing/formatting/status transitions out of route wrappers where practical.
+- Example: `src/features/productPriceDetail/hooks/useProductPriceDetailController.ts`.
 
 ### Services (`src/services/*`)
 - `rankingService`: distance calculation and ranking score model.
@@ -48,6 +56,7 @@ TypeScript resolves platform implementations via `moduleSuffixes`:
 - `PlacePickerModal.native.tsx` vs `PlacePickerModal.web.tsx`
 - `StoreMap.native.tsx` vs `StoreMap.web.tsx`
 - `ObservedDateInput.native.tsx` vs `ObservedDateInput.web.tsx`
+- `EntryLocationMap.native.tsx` vs `EntryLocationMap.web.tsx`
 
 Rules for split implementations:
 - Keep prop contracts equivalent across variants.

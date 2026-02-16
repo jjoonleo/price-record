@@ -5,6 +5,7 @@ Routes:
 - `app/index.tsx`: immediate redirect to `/compare`.
 - `app/_layout.tsx`: tab shell and bootstrap guard.
 - Tabs: `capture`, `compare`, `history`.
+- Hidden route: `app/product-price-detail.tsx` (navigated from compare price tiles).
 
 Startup states before tabs render:
 - Loading state: migration in progress.
@@ -72,6 +73,35 @@ Required states:
 - Entry count summary.
 - Empty-history state when no records match filters.
 - Timeline list state when entries exist.
+
+## Product Price Detail Screen (`app/product-price-detail.tsx`)
+Primary responsibility:
+- Show selected product/store price entry details with map context and quick actions.
+
+Key flow:
+1. Compare tile press navigates with route params (`productId`, `productName`, `storeId`, `storeName`, `cityArea`, `latitude`, `longitude`, `latestPriceYen`, `observedAt`).
+2. Controller parses params and derives view-model labels/state.
+3. Screen composes semantic UI regions (header, hero, info, location, notes, actions).
+4. Visual-only action/status callbacks surface pending behavior.
+
+Required states:
+- Valid detail rendering state.
+- Invalid-param fallback card state.
+- Status message state for share/navigate/edit/delete pending actions.
+
+Micro-component structure:
+- `src/components/productPriceDetail/ProductPriceDetailHeader.tsx`
+- `src/components/productPriceDetail/ProductPriceHero.tsx`
+- `src/components/productPriceDetail/ProductPriceInformationSection.tsx`
+- `src/components/productPriceDetail/ProductPriceLocationSection.tsx`
+- `src/components/productPriceDetail/ProductPriceNotesSection.tsx`
+- `src/components/productPriceDetail/ProductPriceActionButtons.tsx`
+- `src/components/productPriceDetail/ProductPriceDetailInvalidState.tsx`
+- `src/components/productPriceDetail/ProductPriceStatusMessage.tsx`
+- Exports: `src/components/productPriceDetail/index.ts`
+
+At-a-glance blueprint:
+- `src/components/productPriceDetail/ProductPriceDetailLayoutBlueprint.web.tsx`
 
 ## Place Picker Modal Behavior
 Capture screen delegates location selection to platform-specific modal:
