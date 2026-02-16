@@ -1,6 +1,8 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
+import { Controller, SubmitErrorHandler, SubmitHandler, useForm } from 'react-hook-form';
 import {
   Alert,
   KeyboardAvoidingView,
@@ -14,37 +16,29 @@ import {
   useWindowDimensions
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { z } from 'zod';
 import { ObservedDateInput } from '../src/components/ObservedDateInput';
 import { PlacePickerModal } from '../src/components/PlacePickerModal';
 import { PrimaryButton } from '../src/components/ui/PrimaryButton';
+import {
+  CAPTURE_NOTES_LIMIT,
+  CaptureFormValues,
+  DEFAULT_CAPTURE_COORDINATES,
+  createCaptureFormSchema,
+  getCaptureFormDefaults
+} from '../src/features/capture/formValidation';
+import { useI18n } from '../src/i18n/useI18n';
 import { createPriceEntry } from '../src/db/repositories/priceEntriesRepo';
 import { getOrCreateProduct, listProductOptions } from '../src/db/repositories/productsRepo';
 import { getOrCreateStore } from '../src/db/repositories/storesRepo';
 import { captureCurrentLocation } from '../src/services/locationService';
-import { useI18n } from '../src/i18n/useI18n';
 import { colors, radius, shadows, spacing, typography } from '../src/theme/tokens';
 import { Coordinates, PlaceSelection } from '../src/types/domain';
 import { shouldApplySuggestedStoreName } from '../src/utils/placeAutofill';
 
-const entrySchema = z.object({
-  productName: z.string().trim().min(1),
-  storeName: z.string().trim().min(1),
-  cityArea: z.string().trim().min(1),
-  priceYen: z.coerce.number().int().positive(),
-  latitude: z.coerce.number().gte(-90).lte(90),
-  longitude: z.coerce.number().gte(-180).lte(180),
-  observedAt: z.date()
-});
-
 const DEFAULT_COORDINATES: Coordinates = {
-  latitude: 35.6812,
-  longitude: 139.7671
+  latitude: DEFAULT_CAPTURE_COORDINATES.latitude,
+  longitude: DEFAULT_CAPTURE_COORDINATES.longitude
 };
-
-const NOTES_LIMIT = 140;
-
-const nowDate = (): Date => new Date();
 
 const toDateOnlyIso = (date: Date): string => {
   const localDateOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate());
@@ -57,19 +51,10 @@ export default function CaptureScreen() {
   const { width } = useWindowDimensions();
   const { language, t } = useI18n();
 
-  const [productName, setProductName] = useState('');
-  const [storeName, setStoreName] = useState('');
-  const [cityArea, setCityArea] = useState('');
-  const [priceYen, setPriceYen] = useState('');
-  const [latitude, setLatitude] = useState(DEFAULT_COORDINATES.latitude.toString());
-  const [longitude, setLongitude] = useState(DEFAULT_COORDINATES.longitude.toString());
   const [addressLine, setAddressLine] = useState('');
-  const [notes, setNotes] = useState('');
-  const [observedAtDate, setObservedAtDate] = useState<Date>(nowDate());
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isPlacePickerVisible, setIsPlacePickerVisible] = useState(false);
-  const [hasMapSelection, setHasMapSelection] = useState(false);
   const [selectedPlaceName, setSelectedPlaceName] = useState('');
   const [productSuggestions, setProductSuggestions] = useState<string[]>([]);
   const [storeNameTouched, setStoreNameTouched] = useState(false);
@@ -80,6 +65,46 @@ export default function CaptureScreen() {
   const frameWidth = useMemo(() => Math.min(Math.max(width - spacing.md * 2, 0), 448), [width]);
   const bottomBarInset = Math.max(insets.bottom, spacing.md);
   const scrollBottomPadding = 124 + bottomBarInset;
+
+  const schema = useMemo(
+    () =>
+      createCaptureFormSchema({
+        productRequired: t('validation_product_required'),
+        priceRequired: t('validation_price_required'),
+        priceInvalidInteger: t('validation_price_invalid_integer'),
+        pricePositive: t('validation_price_positive'),
+        storeRequired: t('validation_store_required'),
+        cityAreaRequired: t('validation_city_area_required'),
+        dateRequired: t('validation_date_required'),
+        locationRequired: t('validation_location_required'),
+        coordinatesInvalid: t('validation_coordinates_invalid'),
+        notesTooLong: t('input_error')
+      }),
+    [t]
+  );
+
+  const {
+    control,
+    formState: { errors },
+    getValues,
+    handleSubmit,
+    reset,
+    setValue,
+    watch
+  } = useForm<CaptureFormValues>({
+    resolver: zodResolver(schema),
+    mode: 'onTouched',
+    reValidateMode: 'onChange',
+    defaultValues: getCaptureFormDefaults()
+  });
+
+  const storeName = watch('storeName');
+  const cityArea = watch('cityArea');
+  const latitude = watch('latitude');
+  const longitude = watch('longitude');
+  const notes = watch('notes');
+  const observedAtDate = watch('observedAt');
+  const hasMapSelection = watch('hasMapSelection');
 
   const observedPreview = useMemo(() => {
     return new Intl.DateTimeFormat(locale, {
@@ -100,20 +125,13 @@ export default function CaptureScreen() {
   };
 
   const resetDraft = (nextStatus: string | null = null) => {
-    setPriceYen('');
-    setProductName('');
-    setStoreName('');
-    setCityArea('');
+    reset(getCaptureFormDefaults());
     setAddressLine('');
-    setNotes('');
-    setLatitude(DEFAULT_COORDINATES.latitude.toString());
-    setLongitude(DEFAULT_COORDINATES.longitude.toString());
-    setHasMapSelection(false);
     setSelectedPlaceName('');
     setProductSuggestions([]);
     setStoreNameTouched(false);
     setLastAutoFilledStoreName(null);
-    setObservedAtDate(nowDate());
+    setInitialPickerCoordinates(DEFAULT_COORDINATES);
     setStatusMessage(nextStatus);
   };
 
@@ -139,24 +157,41 @@ export default function CaptureScreen() {
 
   const handleApplyPlaceSelection = (selection: PlaceSelection) => {
     setInitialPickerCoordinates({ latitude: selection.latitude, longitude: selection.longitude });
-    setHasMapSelection(true);
     setSelectedPlaceName(selection.suggestedStoreName ?? '');
-    setLatitude(selection.latitude.toFixed(6));
-    setLongitude(selection.longitude.toFixed(6));
-    setCityArea(selection.cityArea);
+    setAddressLine(selection.addressLine ?? '');
 
-    if (selection.addressLine) {
-      setAddressLine(selection.addressLine);
-    }
+    setValue('hasMapSelection', true, {
+      shouldDirty: true,
+      shouldTouch: true,
+      shouldValidate: true
+    });
+    setValue('latitude', selection.latitude.toFixed(6), {
+      shouldDirty: true,
+      shouldTouch: true,
+      shouldValidate: true
+    });
+    setValue('longitude', selection.longitude.toFixed(6), {
+      shouldDirty: true,
+      shouldTouch: true,
+      shouldValidate: true
+    });
+    setValue('cityArea', selection.cityArea, {
+      shouldDirty: true,
+      shouldTouch: true,
+      shouldValidate: true
+    });
 
     const canAutoFillStoreName = shouldApplySuggestedStoreName({
-      currentStoreName: storeName,
+      currentStoreName: getValues('storeName'),
       storeNameTouched,
       lastAutoFilledStoreName
     });
 
     if (selection.suggestedStoreName && canAutoFillStoreName) {
-      setStoreName(selection.suggestedStoreName);
+      setValue('storeName', selection.suggestedStoreName, {
+        shouldDirty: true,
+        shouldValidate: true
+      });
       setLastAutoFilledStoreName(selection.suggestedStoreName);
       setStoreNameTouched(false);
     }
@@ -164,42 +199,19 @@ export default function CaptureScreen() {
     setStatusMessage(t('map_selected_status'));
   };
 
-  const handleSave = async () => {
+  const onValidSubmit: SubmitHandler<CaptureFormValues> = async (values) => {
     setIsSaving(true);
     setStatusMessage(null);
 
-    if (!hasMapSelection) {
-      setIsSaving(false);
-      setStatusMessage(t('map_required_status'));
-      return;
-    }
-
-    const parsed = entrySchema.safeParse({
-      productName,
-      storeName,
-      cityArea,
-      priceYen,
-      latitude,
-      longitude,
-      observedAt: observedAtDate
-    });
-
-    if (!parsed.success) {
-      setIsSaving(false);
-      const firstIssue = parsed.error.issues[0];
-      setStatusMessage(firstIssue?.message ?? t('input_error'));
-      return;
-    }
-
     try {
-      const observedAt = toDateOnlyIso(parsed.data.observedAt);
-      const product = await getOrCreateProduct(parsed.data.productName);
+      const observedAt = toDateOnlyIso(values.observedAt);
+      const product = await getOrCreateProduct(values.productName);
       const store = await getOrCreateStore({
-        name: parsed.data.storeName,
-        cityArea: parsed.data.cityArea,
+        name: values.storeName,
+        cityArea: values.cityArea,
         coordinates: {
-          latitude: parsed.data.latitude,
-          longitude: parsed.data.longitude
+          latitude: Number(values.latitude),
+          longitude: Number(values.longitude)
         },
         addressLine
       });
@@ -207,7 +219,7 @@ export default function CaptureScreen() {
       await createPriceEntry({
         productId: product.id,
         storeId: store.id,
-        priceYen: parsed.data.priceYen,
+        priceYen: Number(values.priceYen),
         observedAt
       });
 
@@ -220,12 +232,23 @@ export default function CaptureScreen() {
     }
   };
 
+  const onInvalidSubmit: SubmitErrorHandler<CaptureFormValues> = () => {
+    // Inline field-level errors are shown via react-hook-form state.
+  };
+
+  const submitForm = handleSubmit(onValidSubmit, onInvalidSubmit);
+
   const locationPrimary = hasMapSelection
     ? selectedPlaceName || storeName || t('unnamed_place')
     : t('not_selected');
   const locationSecondary = hasMapSelection
     ? addressLine || cityArea || t('not_selected')
     : t('not_selected');
+  const locationErrorMessage =
+    errors.hasMapSelection?.message ||
+    errors.cityArea?.message ||
+    errors.latitude?.message ||
+    errors.longitude?.message;
 
   return (
     <SafeAreaView edges={['top']} style={styles.screen}>
@@ -266,17 +289,26 @@ export default function CaptureScreen() {
                 <View style={styles.card}>
                   <View style={styles.fieldRow}>
                     <Text style={styles.rowLabel}>{t('name')}</Text>
-                    <TextInput
-                      placeholder={t('capture_product_placeholder')}
-                      placeholderTextColor={colors.textTertiary}
-                      style={styles.rowInput}
-                      value={productName}
-                      onChangeText={(value) => {
-                        setProductName(value);
-                        void refreshSuggestions(value);
-                      }}
+                    <Controller
+                      control={control}
+                      name="productName"
+                      render={({ field: { onBlur, onChange, value } }) => (
+                        <TextInput
+                          placeholder={t('capture_product_placeholder')}
+                          placeholderTextColor={colors.textTertiary}
+                          style={styles.rowInput}
+                          value={value}
+                          onBlur={onBlur}
+                          onChangeText={(nextValue) => {
+                            onChange(nextValue);
+                            void refreshSuggestions(nextValue);
+                          }}
+                        />
+                      )}
                     />
                   </View>
+
+                  {errors.productName?.message ? <Text style={styles.fieldError}>{errors.productName.message}</Text> : null}
 
                   {productSuggestions.length > 0 ? (
                     <>
@@ -286,7 +318,10 @@ export default function CaptureScreen() {
                           <Pressable
                             key={item}
                             onPress={() => {
-                              setProductName(item);
+                              setValue('productName', item, {
+                                shouldDirty: true,
+                                shouldValidate: true
+                              });
                               setProductSuggestions([]);
                             }}
                             style={styles.suggestionChip}
@@ -306,31 +341,51 @@ export default function CaptureScreen() {
                   <View style={styles.fieldRow}>
                     <Text style={styles.rowLabel}>{t('price')}</Text>
                     <View style={styles.priceInputWrap}>
-                      <TextInput
-                        keyboardType="numeric"
-                        placeholder={t('capture_price_placeholder')}
-                        placeholderTextColor={colors.textTertiary}
-                        style={styles.priceInput}
-                        value={priceYen}
-                        onChangeText={setPriceYen}
+                      <Controller
+                        control={control}
+                        name="priceYen"
+                        render={({ field: { onBlur, onChange, value } }) => (
+                          <TextInput
+                            keyboardType="numeric"
+                            placeholder={t('capture_price_placeholder')}
+                            placeholderTextColor={colors.textTertiary}
+                            style={styles.priceInput}
+                            value={value}
+                            onBlur={onBlur}
+                            onChangeText={onChange}
+                          />
+                        )}
                       />
                       <Text style={styles.currencyLabel}>JPY</Text>
                     </View>
                   </View>
+
+                  {errors.priceYen?.message ? <Text style={styles.fieldError}>{errors.priceYen.message}</Text> : null}
 
                   <View style={styles.divider} />
 
                   <View style={styles.dateRow}>
                     <Text style={styles.rowLabel}>{t('date')}</Text>
                     <View style={styles.dateInputWrap}>
-                      <ObservedDateInput
-                        value={observedAtDate}
-                        preview={observedPreview}
-                        labelDone={t('done')}
-                        onChange={setObservedAtDate}
+                      <Controller
+                        control={control}
+                        name="observedAt"
+                        render={({ field }) => (
+                          <ObservedDateInput
+                            value={field.value}
+                            preview={observedPreview}
+                            labelDone={t('done')}
+                            onChange={(nextDate) => {
+                              field.onChange(nextDate);
+                              field.onBlur();
+                            }}
+                          />
+                        )}
                       />
                     </View>
                   </View>
+
+                  {errors.observedAt?.message ? <Text style={styles.fieldError}>{errors.observedAt.message}</Text> : null}
                 </View>
               </View>
 
@@ -340,15 +395,22 @@ export default function CaptureScreen() {
                   <View style={styles.fieldRow}>
                     <Text style={styles.rowLabel}>{t('store')}</Text>
                     <View style={styles.storeInputWrap}>
-                      <TextInput
-                        placeholder={t('capture_store_placeholder')}
-                        placeholderTextColor={colors.textTertiary}
-                        style={styles.rowInput}
-                        value={storeName}
-                        onChangeText={(value) => {
-                          setStoreName(value);
-                          setStoreNameTouched(true);
-                        }}
+                      <Controller
+                        control={control}
+                        name="storeName"
+                        render={({ field: { onBlur, onChange, value } }) => (
+                          <TextInput
+                            placeholder={t('capture_store_placeholder')}
+                            placeholderTextColor={colors.textTertiary}
+                            style={styles.rowInput}
+                            value={value}
+                            onBlur={onBlur}
+                            onChangeText={(nextValue) => {
+                              onChange(nextValue);
+                              setStoreNameTouched(true);
+                            }}
+                          />
+                        )}
                       />
                       <Pressable
                         accessibilityRole="button"
@@ -361,6 +423,8 @@ export default function CaptureScreen() {
                       </Pressable>
                     </View>
                   </View>
+
+                  {errors.storeName?.message ? <Text style={styles.fieldError}>{errors.storeName.message}</Text> : null}
 
                   <View style={styles.divider} />
 
@@ -387,26 +451,35 @@ export default function CaptureScreen() {
                 </View>
 
                 {!hasMapSelection ? <Text style={styles.locationRequiredHint}>{t('location_required_hint')}</Text> : null}
+                {locationErrorMessage ? <Text style={styles.fieldErrorPadded}>{locationErrorMessage}</Text> : null}
                 <Text style={styles.shareHint}>{t('capture_share_hint')}</Text>
               </View>
 
               <View style={styles.section}>
                 <Text style={styles.sectionLabel}>{t('notes')}</Text>
                 <View style={styles.notesCard}>
-                  <TextInput
-                    multiline
-                    maxLength={NOTES_LIMIT}
-                    placeholder={t('capture_notes_placeholder')}
-                    placeholderTextColor={colors.textTertiary}
-                    style={styles.notesInput}
-                    textAlignVertical="top"
-                    value={notes}
-                    onChangeText={setNotes}
+                  <Controller
+                    control={control}
+                    name="notes"
+                    render={({ field: { onBlur, onChange, value } }) => (
+                      <TextInput
+                        multiline
+                        maxLength={CAPTURE_NOTES_LIMIT}
+                        placeholder={t('capture_notes_placeholder')}
+                        placeholderTextColor={colors.textTertiary}
+                        style={styles.notesInput}
+                        textAlignVertical="top"
+                        value={value}
+                        onBlur={onBlur}
+                        onChangeText={onChange}
+                      />
+                    )}
                   />
                 </View>
                 <Text style={styles.notesCounter}>
-                  {notes.length}/{NOTES_LIMIT}
+                  {notes.length}/{CAPTURE_NOTES_LIMIT}
                 </Text>
+                {errors.notes?.message ? <Text style={styles.fieldErrorPadded}>{errors.notes.message}</Text> : null}
               </View>
 
               {statusMessage ? <Text style={styles.statusMessage}>{statusMessage}</Text> : null}
@@ -418,7 +491,8 @@ export default function CaptureScreen() {
               <PrimaryButton
                 label={isSaving ? t('saving') : t('save_entry')}
                 onPress={() => {
-                  void handleSave();
+                  setStatusMessage(null);
+                  void submitForm();
                 }}
                 disabled={isSaving}
                 style={styles.saveButton}
@@ -554,6 +628,22 @@ const styles = StyleSheet.create({
     backgroundColor: colors.divider,
     height: StyleSheet.hairlineWidth,
     marginLeft: spacing.md
+  },
+  fieldError: {
+    color: colors.warning,
+    fontFamily: typography.body,
+    fontSize: typography.sizes.caption,
+    lineHeight: 19,
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.xs
+  },
+  fieldErrorPadded: {
+    color: colors.warning,
+    fontFamily: typography.body,
+    fontSize: typography.sizes.caption,
+    lineHeight: 19,
+    marginTop: spacing.xs,
+    paddingHorizontal: spacing.md
   },
   chipsRow: {
     flexDirection: 'row',

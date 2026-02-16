@@ -46,7 +46,10 @@ Protects:
 - [ ] Open Capture and verify initial defaults load.
 - [ ] Verify product suggestion chips appear for typed text.
 - [ ] Attempt save without map selection and confirm blocked with status message.
+- [ ] Tap Save with empty required fields and confirm inline per-field errors render (no global input validation summary).
+- [ ] Confirm validation starts after first blur for each field, then revalidates while editing.
 - [ ] Complete place selection and confirm city area/coordinates populate.
+- [ ] Confirm location validation error clears immediately after map selection is confirmed.
 - [ ] Save valid entry and confirm success alert + form reset.
 
 ## Compare
