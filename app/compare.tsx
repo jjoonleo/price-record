@@ -13,7 +13,6 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppCard } from '../src/components/ui/AppCard';
-import { PillChip } from '../src/components/ui/PillChip';
 import { PrimaryButton } from '../src/components/ui/PrimaryButton';
 import {
   getLatestStorePricesByProduct,
@@ -124,8 +123,12 @@ export default function CompareScreen() {
 
       setProducts(productOptions);
 
-      const resolvedProductId = selectedProductId ?? productOptions[0]?.id ?? null;
-      if (!selectedProductId && resolvedProductId) {
+      const selectedProductExists = Boolean(
+        selectedProductId && productOptions.some((product) => product.id === selectedProductId)
+      );
+      const resolvedProductId = selectedProductExists ? selectedProductId : productOptions[0]?.id ?? null;
+
+      if (resolvedProductId !== selectedProductId) {
         setSelectedProductId(resolvedProductId);
         clearHistoryStoreFilter();
       }
@@ -183,28 +186,6 @@ export default function CompareScreen() {
     [products, selectedProductId]
   );
 
-  const handleSelectProduct = useCallback(
-    (productId: string) => {
-      if (productId === selectedProductId) {
-        return;
-      }
-
-      setSelectedProductId(productId);
-      clearHistoryStoreFilter();
-      setStatusMessage(null);
-      setIsLoading(true);
-      setErrorMessage(null);
-      void refreshForProduct(productId, userLocation)
-        .catch((error) => {
-          setErrorMessage(error instanceof Error ? error.message : t('compare_load_error'));
-        })
-        .finally(() => {
-          setIsLoading(false);
-        });
-    },
-    [clearHistoryStoreFilter, refreshForProduct, selectedProductId, setSelectedProductId, t, userLocation]
-  );
-
   const handleToggleSaved = (storeId: string) => {
     setSavedStoreIds((previous) => {
       if (previous.includes(storeId)) {
@@ -241,7 +222,7 @@ export default function CompareScreen() {
         <View style={[styles.headerRow, { width: frameWidth }]}> 
           <Pressable
             accessibilityRole="button"
-            onPress={() => router.navigate('/capture')}
+            onPress={() => router.navigate('/')}
             style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
           >
             <MaterialCommunityIcons color={colors.primary} name="chevron-left" size={19} />
@@ -258,17 +239,6 @@ export default function CompareScreen() {
             <MaterialCommunityIcons color={colors.primary} name="qrcode-scan" size={18} />
           </Pressable>
         </View>
-
-        <ScrollView horizontal contentContainerStyle={[styles.chipsRow, { paddingHorizontal: (width - frameWidth) / 2 }]} showsHorizontalScrollIndicator={false}>
-          {products.map((product) => (
-            <PillChip
-              key={product.id}
-              active={product.id === selectedProductId}
-              label={product.name}
-              onPress={() => handleSelectProduct(product.id)}
-            />
-          ))}
-        </ScrollView>
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -540,10 +510,6 @@ const styles = StyleSheet.create({
     height: 35,
     justifyContent: 'center',
     width: 35
-  },
-  chipsRow: {
-    gap: spacing.xs,
-    paddingRight: spacing.md
   },
   scrollContent: {
     alignItems: 'center',

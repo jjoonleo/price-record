@@ -11,6 +11,7 @@ export const detectLanguage = (): Language => {
 
 export const translations = {
   en: {
+    tabs_home: 'Home',
     tabs_capture: 'Capture',
     tabs_compare: 'Compare',
     tabs_history: 'History',
@@ -86,6 +87,15 @@ export const translations = {
     clear_nickname_title: 'Remove nickname?',
     clear_nickname_body: 'This store already has a nickname. Save without nickname and remove it?',
     clear_nickname_confirm: 'Remove',
+
+    home_title: 'Best Prices',
+    home_search_placeholder: 'Search matcha, kitkats...',
+    home_loading: 'Loading recent prices...',
+    home_load_error: 'Failed to load home prices.',
+    home_empty_title: 'No prices yet',
+    home_empty_body: 'Capture your first price to start building this list.',
+    home_no_results: 'No matches found',
+    home_capture: 'Capture',
 
     compare_title: 'Where Should You Buy?',
     compare_subtitle: 'Compare item prices by area, then revisit the best store based on price and distance.',
@@ -190,6 +200,7 @@ export const translations = {
     profile_placeholder_body: 'Saved stores, shopping preferences, and account settings will appear here.'
   },
   ko: {
+    tabs_home: '홈',
     tabs_capture: '기록',
     tabs_compare: '비교',
     tabs_history: '이력',
@@ -265,6 +276,15 @@ export const translations = {
     clear_nickname_title: '별칭을 삭제할까요?',
     clear_nickname_body: '이 매장에는 기존 별칭이 있어요. 별칭 없이 저장하고 삭제할까요?',
     clear_nickname_confirm: '삭제',
+
+    home_title: '최저가',
+    home_search_placeholder: '말차, 킷캣 등을 검색해 보세요...',
+    home_loading: '최근 가격을 불러오는 중...',
+    home_load_error: '홈 가격 목록을 불러오지 못했어요.',
+    home_empty_title: '아직 기록된 가격이 없어요',
+    home_empty_body: '첫 가격을 기록하면 이 목록에 표시됩니다.',
+    home_no_results: '검색 결과가 없어요',
+    home_capture: '기록',
 
     compare_title: '어디서 구매할까요?',
     compare_subtitle: '지역별 가격을 비교하고, 가격과 거리 기준으로 최적 매장을 확인하세요.',

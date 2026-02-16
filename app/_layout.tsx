@@ -58,7 +58,7 @@ export default function RootLayout() {
 
   return (
     <Tabs
-      initialRouteName="compare"
+      initialRouteName="index"
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarActiveTintColor: colors.primary,
@@ -67,21 +67,22 @@ export default function RootLayout() {
         tabBarLabelStyle: styles.tabLabel,
         tabBarIcon: ({ color, focused }) => {
           const iconByRoute: Record<string, keyof typeof MaterialCommunityIcons.glyphMap> = {
-            capture: focused ? 'home' : 'home-outline',
+            index: focused ? 'home' : 'home-outline',
             compare: focused ? 'compare' : 'compare',
             history: focused ? 'history' : 'history',
-            profile: focused ? 'account' : 'account-outline'
+            profile: focused ? 'account' : 'account-outline',
+            capture: focused ? 'qrcode-scan' : 'qrcode-scan'
           };
 
           return <MaterialCommunityIcons color={color} name={iconByRoute[route.name] ?? 'circle-outline'} size={20} />;
         }
       })}
     >
-      <Tabs.Screen name="index" options={{ href: null }} />
-      <Tabs.Screen name="capture" options={{ title: 'Capture' }} />
-      <Tabs.Screen name="compare" options={{ title: 'Compare' }} />
-      <Tabs.Screen name="history" options={{ title: 'History' }} />
-      <Tabs.Screen name="profile" options={{ title: 'Profile' }} />
+      <Tabs.Screen name="index" options={{ title: t('tabs_home') }} />
+      <Tabs.Screen name="capture" options={{ href: null }} />
+      <Tabs.Screen name="compare" options={{ title: t('tabs_compare') }} />
+      <Tabs.Screen name="history" options={{ title: t('tabs_history') }} />
+      <Tabs.Screen name="profile" options={{ title: t('tabs_profile') }} />
       <Tabs.Screen name="product-price-detail" options={{ href: null }} />
     </Tabs>
   );
