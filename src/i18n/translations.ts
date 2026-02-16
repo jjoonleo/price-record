@@ -71,6 +71,7 @@ export const translations = {
     validation_city_area_required: 'Select a city area from map.',
     validation_date_required: 'Select an observed date.',
     validation_location_required: 'Select the store location on map before saving this price.',
+    validation_address_required: 'Select a place with a valid address.',
     validation_coordinates_invalid: 'Selected map coordinates are invalid.',
 
     compare_title: 'Where Should You Buy?',
@@ -215,6 +216,7 @@ export const translations = {
     validation_city_area_required: '지도에서 지역을 선택해 주세요.',
     validation_date_required: '관찰 날짜를 선택해 주세요.',
     validation_location_required: '가격 저장 전에 지도에서 매장 위치를 선택해 주세요.',
+    validation_address_required: '유효한 주소가 있는 장소를 선택해 주세요.',
     validation_coordinates_invalid: '선택한 지도 좌표가 올바르지 않아요.',
 
     compare_title: '어디서 구매할까요?',

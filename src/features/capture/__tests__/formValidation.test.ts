@@ -13,6 +13,7 @@ const messages = {
   cityAreaRequired: 'city required',
   dateRequired: 'date required',
   locationRequired: 'location required',
+  addressRequired: 'address required',
   coordinatesInvalid: 'coords invalid',
   notesTooLong: 'notes too long'
 };
@@ -27,6 +28,7 @@ const createValidValues = () => ({
   cityArea: 'Chiyoda',
   latitude: '35.6812',
   longitude: '139.7671',
+  addressLine: '1 Chome-9 Marunouchi, Chiyoda City, Tokyo',
   hasMapSelection: true
 });
 
@@ -86,6 +88,16 @@ describe('createCaptureFormSchema', () => {
     expect(result.success).toBe(false);
     if (result.success) return;
     expect(result.error.flatten().fieldErrors.hasMapSelection).toContain(messages.locationRequired);
+  });
+
+  test('requires address after map selection', () => {
+    const result = schema.safeParse({
+      ...createValidValues(),
+      addressLine: '   '
+    });
+    expect(result.success).toBe(false);
+    if (result.success) return;
+    expect(result.error.flatten().fieldErrors.addressLine).toContain(messages.addressRequired);
   });
 
   test('rejects invalid coordinates', () => {

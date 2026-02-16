@@ -22,7 +22,7 @@ export type UpsertStoreInput = {
   name: string;
   cityArea: string;
   coordinates: Coordinates;
-  addressLine?: string;
+  addressLine: string;
 };
 
 const mapStore = (row: StoreRow): Store => ({
@@ -31,7 +31,7 @@ const mapStore = (row: StoreRow): Store => ({
   latitude: Number(row.latitude),
   longitude: Number(row.longitude),
   cityArea: row.city_area,
-  addressLine: row.address_line ?? undefined,
+  addressLine: row.address_line ?? '',
   createdAt: row.created_at
 });
 
@@ -48,6 +48,11 @@ export const getOrCreateStore = async (input: UpsertStoreInput): Promise<Store> 
   }
 
   const { latitude, longitude } = input.coordinates;
+  const address = input.addressLine.trim();
+
+  if (!address) {
+    throw new Error('Address is required.');
+  }
 
   if (Platform.OS === 'web') {
     const existing = readWebDb().stores.find(
@@ -59,11 +64,21 @@ export const getOrCreateStore = async (input: UpsertStoreInput): Promise<Store> 
     );
 
     if (existing) {
-      return existing;
+      if (!existing.addressLine.trim()) {
+        updateWebDb((db) => {
+          const match = db.stores.find((row) => row.id === existing.id);
+          if (match) {
+            match.addressLine = address;
+          }
+        });
+      }
+      return {
+        ...existing,
+        addressLine: existing.addressLine.trim() || address
+      };
     }
 
     const now = new Date().toISOString();
-    const address = input.addressLine?.trim() || undefined;
     const next: Store = {
       id: createId(),
       name,
@@ -93,12 +108,17 @@ export const getOrCreateStore = async (input: UpsertStoreInput): Promise<Store> 
   );
 
   if (existing) {
-    return mapStore(existing);
+    if (!existing.address_line) {
+      await runSql(`UPDATE stores SET address_line = ? WHERE id = ?;`, [address, existing.id]);
+    }
+    return {
+      ...mapStore(existing),
+      addressLine: existing.address_line ?? address
+    };
   }
 
   const id = createId();
   const now = new Date().toISOString();
-  const address = input.addressLine?.trim() || null;
 
   await runSql(
     `INSERT INTO stores (id, name, latitude, longitude, city_area, address_line, created_at)
@@ -112,7 +132,7 @@ export const getOrCreateStore = async (input: UpsertStoreInput): Promise<Store> 
     latitude,
     longitude,
     cityArea,
-    addressLine: address ?? undefined,
+    addressLine: address,
     createdAt: now
   };
 };

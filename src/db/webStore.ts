@@ -13,7 +13,7 @@ export type WebStore = {
   latitude: number;
   longitude: number;
   cityArea: string;
-  addressLine?: string;
+  addressLine: string;
   createdAt: string;
 };
 
@@ -63,9 +63,16 @@ export const readWebDb = (): WebDb => {
 
   try {
     const parsed = JSON.parse(raw) as Partial<WebDb>;
+    const stores = Array.isArray(parsed.stores)
+      ? parsed.stores.map((store) => ({
+          ...store,
+          addressLine: typeof store?.addressLine === 'string' ? store.addressLine : ''
+        }))
+      : [];
+
     return {
       products: Array.isArray(parsed.products) ? parsed.products : [],
-      stores: Array.isArray(parsed.stores) ? parsed.stores : [],
+      stores,
       priceEntries: Array.isArray(parsed.priceEntries) ? parsed.priceEntries : []
     };
   } catch {

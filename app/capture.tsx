@@ -51,7 +51,6 @@ export default function CaptureScreen() {
   const { width } = useWindowDimensions();
   const { language, t } = useI18n();
 
-  const [addressLine, setAddressLine] = useState('');
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isPlacePickerVisible, setIsPlacePickerVisible] = useState(false);
@@ -77,6 +76,7 @@ export default function CaptureScreen() {
         cityAreaRequired: t('validation_city_area_required'),
         dateRequired: t('validation_date_required'),
         locationRequired: t('validation_location_required'),
+        addressRequired: t('validation_address_required'),
         coordinatesInvalid: t('validation_coordinates_invalid'),
         notesTooLong: t('input_error')
       }),
@@ -102,6 +102,7 @@ export default function CaptureScreen() {
   const cityArea = watch('cityArea');
   const latitude = watch('latitude');
   const longitude = watch('longitude');
+  const addressLine = watch('addressLine');
   const notes = watch('notes');
   const observedAtDate = watch('observedAt');
   const hasMapSelection = watch('hasMapSelection');
@@ -126,7 +127,6 @@ export default function CaptureScreen() {
 
   const resetDraft = (nextStatus: string | null = null) => {
     reset(getCaptureFormDefaults());
-    setAddressLine('');
     setSelectedPlaceName('');
     setProductSuggestions([]);
     setStoreNameTouched(false);
@@ -158,7 +158,6 @@ export default function CaptureScreen() {
   const handleApplyPlaceSelection = (selection: PlaceSelection) => {
     setInitialPickerCoordinates({ latitude: selection.latitude, longitude: selection.longitude });
     setSelectedPlaceName(selection.suggestedStoreName ?? '');
-    setAddressLine(selection.addressLine ?? '');
 
     setValue('hasMapSelection', true, {
       shouldDirty: true,
@@ -176,6 +175,11 @@ export default function CaptureScreen() {
       shouldValidate: true
     });
     setValue('cityArea', selection.cityArea, {
+      shouldDirty: true,
+      shouldTouch: true,
+      shouldValidate: true
+    });
+    setValue('addressLine', selection.addressLine, {
       shouldDirty: true,
       shouldTouch: true,
       shouldValidate: true
@@ -213,7 +217,7 @@ export default function CaptureScreen() {
           latitude: Number(values.latitude),
           longitude: Number(values.longitude)
         },
-        addressLine
+        addressLine: values.addressLine
       });
 
       await createPriceEntry({
@@ -246,6 +250,7 @@ export default function CaptureScreen() {
     : t('not_selected');
   const locationErrorMessage =
     errors.hasMapSelection?.message ||
+    errors.addressLine?.message ||
     errors.cityArea?.message ||
     errors.latitude?.message ||
     errors.longitude?.message;
@@ -511,7 +516,7 @@ export default function CaptureScreen() {
                 latitude: Number.parseFloat(latitude) || DEFAULT_COORDINATES.latitude,
                 longitude: Number.parseFloat(longitude) || DEFAULT_COORDINATES.longitude,
                 cityArea: cityArea || t('not_selected'),
-                addressLine: addressLine || undefined,
+                addressLine,
                 suggestedStoreName: selectedPlaceName || undefined
               }
             : undefined
