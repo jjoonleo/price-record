@@ -16,6 +16,7 @@ export type PlaceDetails = {
   placeId: string;
   name?: string;
   address?: string;
+  websiteUri?: string;
   latitude: number;
   longitude: number;
 };
@@ -175,7 +176,7 @@ export const getPlaceDetails = async (placeId: string): Promise<PlaceDetails> =>
       method: 'GET',
       headers: {
         'X-Goog-Api-Key': env.googlePlacesApiKey,
-        'X-Goog-FieldMask': 'id,displayName.text,formattedAddress,location'
+        'X-Goog-FieldMask': 'id,displayName.text,formattedAddress,location,websiteUri'
       }
     });
   } catch (error) {
@@ -208,6 +209,7 @@ export const getPlaceDetails = async (placeId: string): Promise<PlaceDetails> =>
     placeId,
     name: body?.displayName?.text ? String(body.displayName.text) : undefined,
     address: body?.formattedAddress ? String(body.formattedAddress) : undefined,
+    websiteUri: body?.websiteUri ? String(body.websiteUri) : undefined,
     latitude,
     longitude
   };

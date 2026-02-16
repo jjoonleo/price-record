@@ -2,8 +2,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import {
-  Image,
-  ImageBackground,
+  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -11,22 +10,20 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  View
+  View,
+  useWindowDimensions
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { z } from 'zod';
-import { AppCard } from '../src/components/ui/AppCard';
-import { PillChip } from '../src/components/ui/PillChip';
-import { PrimaryButton } from '../src/components/ui/PrimaryButton';
 import { ObservedDateInput } from '../src/components/ObservedDateInput';
 import { PlacePickerModal } from '../src/components/PlacePickerModal';
+import { PrimaryButton } from '../src/components/ui/PrimaryButton';
 import { createPriceEntry } from '../src/db/repositories/priceEntriesRepo';
 import { getOrCreateProduct, listProductOptions } from '../src/db/repositories/productsRepo';
 import { getOrCreateStore } from '../src/db/repositories/storesRepo';
 import { useI18n } from '../src/i18n/useI18n';
 import { colors, radius, shadows, spacing, typography } from '../src/theme/tokens';
 import { Coordinates, PlaceSelection } from '../src/types/domain';
-import { formatYen } from '../src/utils/formatters';
 import { shouldApplySuggestedStoreName } from '../src/utils/placeAutofill';
 
 const entrySchema = z.object({
@@ -39,18 +36,12 @@ const entrySchema = z.object({
   observedAt: z.date()
 });
 
-const DEFAULT_COORDS: Coordinates = {
+const DEFAULT_COORDINATES: Coordinates = {
   latitude: 35.6812,
   longitude: 139.7671
 };
 
-const PRODUCT_PREVIEW_IMAGE =
-  'https://www.figma.com/api/mcp/asset/2c8dfeab-4703-46bb-bf49-2862bbf3f14b';
-const MAP_PREVIEW_IMAGE =
-  'https://www.figma.com/api/mcp/asset/01bc5b08-f5aa-4e7d-86e5-8204c24e9069';
-
-const SUGGESTED_PRODUCTS = ['Pocky', 'KitKat', 'Matcha', 'Sake'];
-const CATEGORIES = ['Snacks', 'Beverage', 'Beauty', 'Daily'];
+const NOTES_LIMIT = 140;
 
 const nowDate = (): Date => new Date();
 
@@ -59,24 +50,20 @@ const toDateOnlyIso = (date: Date): string => {
   return localDateOnly.toISOString();
 };
 
-const nextCategory = (current: string): string => {
-  const currentIndex = CATEGORIES.indexOf(current);
-  const nextIndex = currentIndex >= 0 ? (currentIndex + 1) % CATEGORIES.length : 0;
-  return CATEGORIES[nextIndex];
-};
-
 export default function CaptureScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
   const { language, t } = useI18n();
-  const locale = language === 'ko' ? 'ko-KR' : 'en-US';
 
   const [productName, setProductName] = useState('');
   const [storeName, setStoreName] = useState('');
   const [cityArea, setCityArea] = useState('');
   const [priceYen, setPriceYen] = useState('');
-  const [latitude, setLatitude] = useState(DEFAULT_COORDS.latitude.toFixed(6));
-  const [longitude, setLongitude] = useState(DEFAULT_COORDS.longitude.toFixed(6));
+  const [latitude, setLatitude] = useState(DEFAULT_COORDINATES.latitude.toString());
+  const [longitude, setLongitude] = useState(DEFAULT_COORDINATES.longitude.toString());
   const [addressLine, setAddressLine] = useState('');
+  const [notes, setNotes] = useState('');
   const [observedAtDate, setObservedAtDate] = useState<Date>(nowDate());
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -86,8 +73,11 @@ export default function CaptureScreen() {
   const [productSuggestions, setProductSuggestions] = useState<string[]>([]);
   const [storeNameTouched, setStoreNameTouched] = useState(false);
   const [lastAutoFilledStoreName, setLastAutoFilledStoreName] = useState<string | null>(null);
-  const [selectedCategory, setSelectedCategory] = useState('Snacks');
-  const [notes, setNotes] = useState('');
+
+  const locale = language === 'ko' ? 'ko-KR' : 'en-US';
+  const frameWidth = useMemo(() => Math.min(Math.max(width - spacing.md * 2, 0), 448), [width]);
+  const bottomBarInset = Math.max(insets.bottom, spacing.md);
+  const scrollBottomPadding = 124 + bottomBarInset;
 
   const observedPreview = useMemo(() => {
     return new Intl.DateTimeFormat(locale, {
@@ -97,54 +87,45 @@ export default function CaptureScreen() {
     }).format(observedAtDate);
   }, [locale, observedAtDate]);
 
-  const pricePreview = useMemo(() => {
-    const parsed = Number.parseInt(priceYen, 10);
-    return Number.isFinite(parsed) && parsed > 0 ? parsed : 398;
-  }, [priceYen]);
+  const refreshSuggestions = async (query: string) => {
+    if (query.trim().length === 0) {
+      setProductSuggestions([]);
+      return;
+    }
 
-  const clearForm = () => {
+    const options = await listProductOptions(query);
+    setProductSuggestions(options.map((option) => option.name).slice(0, 6));
+  };
+
+  const resetDraft = (nextStatus: string | null = null) => {
     setPriceYen('');
     setProductName('');
     setStoreName('');
     setCityArea('');
     setAddressLine('');
-    setLatitude(DEFAULT_COORDS.latitude.toFixed(6));
-    setLongitude(DEFAULT_COORDS.longitude.toFixed(6));
+    setNotes('');
+    setLatitude(DEFAULT_COORDINATES.latitude.toString());
+    setLongitude(DEFAULT_COORDINATES.longitude.toString());
     setHasMapSelection(false);
     setSelectedPlaceName('');
+    setProductSuggestions([]);
     setStoreNameTouched(false);
     setLastAutoFilledStoreName(null);
     setObservedAtDate(nowDate());
-    setProductSuggestions([]);
-    setSelectedCategory('Snacks');
-    setNotes('');
-    setStatusMessage(null);
-  };
-
-  const refreshSuggestions = async (query: string) => {
-    const options = await listProductOptions(query);
-    setProductSuggestions(options.map((option) => option.name).slice(0, 6));
+    setStatusMessage(nextStatus);
   };
 
   const getCurrentCoordinates = (): Coordinates => ({
-    latitude: Number.parseFloat(latitude) || DEFAULT_COORDS.latitude,
-    longitude: Number.parseFloat(longitude) || DEFAULT_COORDS.longitude
+    latitude: Number.parseFloat(latitude) || DEFAULT_COORDINATES.latitude,
+    longitude: Number.parseFloat(longitude) || DEFAULT_COORDINATES.longitude
   });
 
   const handleApplyPlaceSelection = (selection: PlaceSelection) => {
     setHasMapSelection(true);
-    setSelectedPlaceName(selection.suggestedStoreName ?? selectedPlaceName);
+    setSelectedPlaceName(selection.suggestedStoreName ?? '');
     setLatitude(selection.latitude.toFixed(6));
     setLongitude(selection.longitude.toFixed(6));
     setCityArea(selection.cityArea);
-
-    if (!productName.trim()) {
-      setProductName('KitKat Matcha Green Tea');
-    }
-
-    if (!priceYen.trim()) {
-      setPriceYen('398');
-    }
 
     if (selection.addressLine) {
       setAddressLine(selection.addressLine);
@@ -212,8 +193,8 @@ export default function CaptureScreen() {
         observedAt
       });
 
-      clearForm();
-      setStatusMessage(t('saved_status'));
+      resetDraft(t('saved_status'));
+      Alert.alert(t('saved_title'), t('saved_message'));
     } catch (error) {
       setStatusMessage(error instanceof Error ? error.message : t('save_error'));
     } finally {
@@ -221,115 +202,128 @@ export default function CaptureScreen() {
     }
   };
 
+  const locationPrimary = hasMapSelection
+    ? selectedPlaceName || storeName || t('unnamed_place')
+    : t('not_selected');
+  const locationSecondary = hasMapSelection
+    ? addressLine || cityArea || t('not_selected')
+    : t('not_selected');
+
   return (
-    <SafeAreaView edges={['top', 'bottom']} style={styles.screen}>
+    <SafeAreaView edges={['top']} style={styles.screen}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.screen}>
-        <View style={styles.header}>
-          <Pressable onPress={() => router.navigate('/compare')} style={styles.headerButton}>
-            <MaterialCommunityIcons color={colors.primary} name="chevron-left" size={20} />
-            <Text style={styles.headerButtonText}>{t('back')}</Text>
-          </Pressable>
-          <Text style={styles.headerTitle} numberOfLines={1}>
-            {hasMapSelection ? t('capture_header_new_entry') : t('capture_header_new_price')}
-          </Text>
-          <Pressable onPress={clearForm} style={styles.headerButtonRight}>
-            <Text style={styles.headerButtonText}>{t('reset')}</Text>
-          </Pressable>
-        </View>
+        <View style={styles.screen}>
+          <View style={styles.headerWrap}>
+            <View style={[styles.headerRow, { width: frameWidth }]}>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => router.navigate('/compare')}
+                style={({ pressed }) => [styles.headerActionLeft, pressed && styles.pressed]}
+              >
+                <MaterialCommunityIcons color={colors.primary} name="chevron-left" size={18} />
+                <Text style={styles.headerActionText}>{t('back')}</Text>
+              </Pressable>
 
-        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-          <View style={styles.mainColumn}>
-            {!hasMapSelection ? (
-              <>
-                <Text style={styles.pageHeading}>{t('capture_title')}</Text>
+              <Text style={styles.headerTitle}>{t('capture_header_new_price')}</Text>
 
-                <View style={styles.sectionWrap}>
-                  <Text style={styles.sectionLabel}>{t('merchandise')}</Text>
-                  <AppCard padded={false} style={styles.flatCard}>
-                    <View style={styles.fieldRow}>
-                      <Text style={styles.fieldLabel}>Name</Text>
-                      <TextInput
-                        placeholder="e.g. Strawberry KitKat"
-                        placeholderTextColor={colors.textTertiary}
-                        style={styles.rowInput}
-                        value={productName}
-                        onChangeText={(value) => {
-                          setProductName(value);
-                          void refreshSuggestions(value);
-                        }}
-                      />
-                    </View>
-                    <View style={styles.divider} />
-                    <ScrollView
-                      horizontal
-                      contentContainerStyle={styles.quickChipRow}
-                      showsHorizontalScrollIndicator={false}
-                    >
-                      {SUGGESTED_PRODUCTS.map((label) => (
-                        <PillChip
-                          key={label}
-                          active={productName.trim().toLowerCase() === label.toLowerCase()}
-                          label={label}
-                          onPress={() => setProductName(label)}
-                        />
-                      ))}
-                      {productSuggestions
-                        .filter((item) => !SUGGESTED_PRODUCTS.includes(item))
-                        .slice(0, 3)
-                        .map((item) => (
-                          <PillChip key={item} label={item} onPress={() => setProductName(item)} />
-                        ))}
-                    </ScrollView>
-                  </AppCard>
-                </View>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => resetDraft(null)}
+                style={({ pressed }) => [styles.headerActionRight, pressed && styles.pressed]}
+              >
+                <Text style={styles.headerActionText}>{t('reset')}</Text>
+              </Pressable>
+            </View>
+          </View>
 
-                <View style={styles.sectionWrap}>
-                  <Text style={styles.sectionLabel}>{t('capture_details')}</Text>
-                  <AppCard padded={false} style={styles.flatCard}>
-                    <View style={styles.fieldRow}>
-                      <Text style={styles.fieldLabel}>{t('price')}</Text>
-                      <View style={styles.priceRowRight}>
-                        <TextInput
-                          keyboardType="numeric"
-                          placeholder="0"
-                          placeholderTextColor={colors.textTertiary}
-                          style={styles.priceInput}
-                          value={priceYen}
-                          onChangeText={setPriceYen}
-                        />
-                        <Text style={styles.currencyText}>JPY</Text>
-                      </View>
-                    </View>
-                    <View style={styles.indentedDivider} />
-                    <Pressable style={styles.fieldRow} onPress={() => setSelectedCategory((value) => nextCategory(value))}>
-                      <Text style={styles.fieldLabel}>{t('category')}</Text>
-                      <View style={styles.trailingRow}>
-                        <Text style={styles.trailingValue}>{selectedCategory}</Text>
-                        <MaterialCommunityIcons color={colors.textDisabled} name="chevron-right" size={20} />
-                      </View>
-                    </Pressable>
-                    <View style={styles.indentedDivider} />
-                    <View style={styles.fieldRow}>
-                      <Text style={styles.fieldLabel}>{t('date')}</Text>
-                      <Text style={styles.dateValue}>{observedPreview}</Text>
-                    </View>
-                  </AppCard>
-                  <View style={styles.dateInputWrap}>
-                    <ObservedDateInput
-                      value={observedAtDate}
-                      preview={observedPreview}
-                      labelDone={t('done')}
-                      onChange={setObservedAtDate}
+          <ScrollView
+            contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollBottomPadding }]}
+            keyboardShouldPersistTaps="handled"
+          >
+            <View style={[styles.mainColumn, { width: frameWidth }]}>
+              <Text style={styles.pageTitle}>{t('capture_header_new_entry')}</Text>
+
+              <View style={styles.section}>
+                <Text style={styles.sectionLabel}>{t('merchandise')}</Text>
+                <View style={styles.card}>
+                  <View style={styles.fieldRow}>
+                    <Text style={styles.rowLabel}>{t('name')}</Text>
+                    <TextInput
+                      placeholder={t('capture_product_placeholder')}
+                      placeholderTextColor={colors.textTertiary}
+                      style={styles.rowInput}
+                      value={productName}
+                      onChangeText={(value) => {
+                        setProductName(value);
+                        void refreshSuggestions(value);
+                      }}
                     />
                   </View>
-                </View>
 
-                <View style={styles.sectionWrap}>
-                  <AppCard padded={false} style={styles.flatCard}>
-                    <View style={styles.fieldRow}>
-                      <Text style={styles.fieldLabel}>{t('store')}</Text>
+                  {productSuggestions.length > 0 ? (
+                    <>
+                      <View style={styles.divider} />
+                      <View style={styles.chipsRow}>
+                        {productSuggestions.map((item) => (
+                          <Pressable
+                            key={item}
+                            onPress={() => {
+                              setProductName(item);
+                              setProductSuggestions([]);
+                            }}
+                            style={styles.suggestionChip}
+                          >
+                            <Text style={styles.suggestionChipText}>{item}</Text>
+                          </Pressable>
+                        ))}
+                      </View>
+                    </>
+                  ) : null}
+                </View>
+              </View>
+
+              <View style={styles.section}>
+                <Text style={styles.sectionLabel}>{t('capture_details')}</Text>
+                <View style={styles.card}>
+                  <View style={styles.fieldRow}>
+                    <Text style={styles.rowLabel}>{t('price')}</Text>
+                    <View style={styles.priceInputWrap}>
                       <TextInput
-                        placeholder="Store Name"
+                        keyboardType="numeric"
+                        placeholder={t('capture_price_placeholder')}
+                        placeholderTextColor={colors.textTertiary}
+                        style={styles.priceInput}
+                        value={priceYen}
+                        onChangeText={setPriceYen}
+                      />
+                      <Text style={styles.currencyLabel}>JPY</Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.divider} />
+
+                  <View style={styles.dateRow}>
+                    <Text style={styles.rowLabel}>{t('date')}</Text>
+                    <View style={styles.dateInputWrap}>
+                      <ObservedDateInput
+                        value={observedAtDate}
+                        preview={observedPreview}
+                        labelDone={t('done')}
+                        onChange={setObservedAtDate}
+                      />
+                    </View>
+                  </View>
+                </View>
+              </View>
+
+              <View style={styles.section}>
+                <Text style={styles.sectionLabel}>{t('location')}</Text>
+                <View style={styles.card}>
+                  <View style={styles.fieldRow}>
+                    <Text style={styles.rowLabel}>{t('store')}</Text>
+                    <View style={styles.storeInputWrap}>
+                      <TextInput
+                        placeholder={t('capture_store_placeholder')}
                         placeholderTextColor={colors.textTertiary}
                         style={styles.rowInput}
                         value={storeName}
@@ -338,103 +332,77 @@ export default function CaptureScreen() {
                           setStoreNameTouched(true);
                         }}
                       />
-                      <Pressable onPress={() => setIsPlacePickerVisible(true)} style={styles.fieldAction}>
-                        <MaterialCommunityIcons color={colors.primary} name="map-marker-radius" size={18} />
+                      <Pressable
+                        accessibilityRole="button"
+                        onPress={() => setIsPlacePickerVisible(true)}
+                        style={({ pressed }) => [styles.mapEntryButton, pressed && styles.pressed]}
+                      >
+                        <MaterialCommunityIcons color={colors.primary} name="map-marker-outline" size={18} />
                       </Pressable>
-                    </View>
-                    <View style={styles.divider} />
-                    <Pressable style={styles.locationQuickRow} onPress={() => setIsPlacePickerVisible(true)}>
-                      <View style={styles.locationTile}>
-                        <ImageBackground source={{ uri: MAP_PREVIEW_IMAGE }} style={styles.locationTileMap} />
-                      </View>
-                      <View style={styles.locationQuickMeta}>
-                        <Text style={styles.locationQuickTitle}>
-                          {hasMapSelection ? cityArea : t('not_selected')}
-                        </Text>
-                        <Text style={styles.locationQuickSubtitle}>{hasMapSelection ? 'Tokyo, Japan' : t('pick_on_map')}</Text>
-                      </View>
-                      <MaterialCommunityIcons color={colors.textDisabled} name="chevron-right" size={20} />
-                    </Pressable>
-                  </AppCard>
-                  <Text style={styles.supportText}>{t('capture_share_hint')}</Text>
-                </View>
-              </>
-            ) : (
-              <>
-                <View style={styles.selectedTopSpacing} />
-                <AppCard padded={false} style={styles.detectedCard}>
-                  <View style={styles.detectedRow}>
-                    <Image source={{ uri: PRODUCT_PREVIEW_IMAGE }} style={styles.productPreviewImage} />
-                    <View style={styles.detectedContent}>
-                      <Text style={styles.detectedName} numberOfLines={1}>
-                        {productName || 'KitKat Matcha Green Tea'}
-                      </Text>
-                      <Text style={styles.detectedSubtitle}>12 Mini Bars Pack</Text>
-                      <View style={styles.detectedPriceRow}>
-                        <Text style={styles.detectedPrice}>{formatYen(pricePreview, locale).replace('JP¥', '¥')}</Text>
-                        <Text style={styles.detectedPriceMuted}>¥450</Text>
-                      </View>
                     </View>
                   </View>
-                </AppCard>
-                <Text style={styles.supportTextLeft}>{t('capture_detected_hint')}</Text>
 
-                <View style={styles.sectionWrap}>
-                  <Text style={styles.sectionLabel}>{t('location')}</Text>
-                  <AppCard padded={false} style={styles.flatCard}>
-                    <View style={styles.mapHeroWrap}>
-                      <ImageBackground source={{ uri: MAP_PREVIEW_IMAGE }} style={styles.mapHeroImage}>
-                        <View style={styles.pinWrap}>
-                          <MaterialCommunityIcons color={colors.mapPin} name="map-marker" size={40} />
-                        </View>
-                        <Pressable onPress={() => setIsPlacePickerVisible(true)} style={styles.viewMapButton}>
-                          <Text style={styles.viewMapText}>{t('view_map')}</Text>
-                        </Pressable>
-                      </ImageBackground>
+                  <View style={styles.divider} />
+
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() => setIsPlacePickerVisible(true)}
+                    style={({ pressed }) => [styles.locationSummaryRow, pressed && styles.pressed]}
+                  >
+                    <View style={styles.locationBadge}>
+                      <MaterialCommunityIcons color={colors.primary} name="map-marker" size={16} />
                     </View>
-                    <View style={styles.locationRowLarge}>
-                      <View style={styles.locationIconCircle}>
-                        <MaterialCommunityIcons color={colors.white} name="storefront-outline" size={16} />
-                      </View>
-                      <View style={styles.locationDetails}>
-                        <Text style={styles.locationName}>{storeName || selectedPlaceName || t('selected_place')}</Text>
-                        <Text style={styles.locationAddress} numberOfLines={1}>
-                          {addressLine || t('no_address')}
-                        </Text>
-                      </View>
-                      <Pressable onPress={() => setIsPlacePickerVisible(true)} style={styles.changeButton}>
-                        <Text style={styles.changeButtonText}>{t('change')}</Text>
-                      </Pressable>
+                    <View style={styles.locationTextWrap}>
+                      <Text numberOfLines={1} style={styles.locationPrimaryText}>
+                        {locationPrimary}
+                      </Text>
+                      <Text numberOfLines={1} style={styles.locationSecondaryText}>
+                        {locationSecondary}
+                      </Text>
                     </View>
-                  </AppCard>
+                    <Text style={styles.locationActionText}>{hasMapSelection ? t('change') : t('pick_on_map')}</Text>
+                  </Pressable>
                 </View>
 
-                <View style={styles.sectionWrap}>
-                  <Text style={styles.sectionLabel}>{t('notes')}</Text>
-                  <AppCard padded={false} style={styles.flatCard}>
-                    <TextInput
-                      multiline
-                      maxLength={140}
-                      numberOfLines={4}
-                      onChangeText={setNotes}
-                      placeholder={t('capture_notes_placeholder')}
-                      placeholderTextColor={colors.textTertiary}
-                      style={styles.notesInput}
-                      textAlignVertical="top"
-                      value={notes}
-                    />
-                  </AppCard>
-                  <Text style={styles.counterText}>{notes.length}/140</Text>
-                </View>
-              </>
-            )}
+                {!hasMapSelection ? <Text style={styles.locationRequiredHint}>{t('location_required_hint')}</Text> : null}
+                <Text style={styles.shareHint}>{t('capture_share_hint')}</Text>
+              </View>
 
-            {statusMessage ? <Text style={styles.status}>{statusMessage}</Text> : null}
+              <View style={styles.section}>
+                <Text style={styles.sectionLabel}>{t('notes')}</Text>
+                <View style={styles.notesCard}>
+                  <TextInput
+                    multiline
+                    maxLength={NOTES_LIMIT}
+                    placeholder={t('capture_notes_placeholder')}
+                    placeholderTextColor={colors.textTertiary}
+                    style={styles.notesInput}
+                    textAlignVertical="top"
+                    value={notes}
+                    onChangeText={setNotes}
+                  />
+                </View>
+                <Text style={styles.notesCounter}>
+                  {notes.length}/{NOTES_LIMIT}
+                </Text>
+              </View>
+
+              {statusMessage ? <Text style={styles.statusMessage}>{statusMessage}</Text> : null}
+            </View>
+          </ScrollView>
+
+          <View style={[styles.bottomBar, { paddingBottom: bottomBarInset }]}>
+            <View style={[styles.bottomBarInner, { width: frameWidth }]}>
+              <PrimaryButton
+                label={isSaving ? t('saving') : t('save_entry')}
+                onPress={() => {
+                  void handleSave();
+                }}
+                disabled={isSaving}
+                style={styles.saveButton}
+              />
+            </View>
           </View>
-        </ScrollView>
-
-        <View style={styles.bottomAction}>
-          <PrimaryButton label={t('save_entry')} onPress={handleSave} disabled={isSaving} />
         </View>
       </KeyboardAvoidingView>
 
@@ -453,70 +421,79 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
     flex: 1
   },
-  header: {
+  headerWrap: {
     alignItems: 'center',
-    backgroundColor: 'rgba(242,242,247,0.9)',
-    borderBottomColor: 'rgba(203,213,225,0.5)',
+    borderBottomColor: colors.divider,
     borderBottomWidth: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    minHeight: 56,
-    paddingHorizontal: spacing.md
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs
   },
-  headerButton: {
+  headerRow: {
     alignItems: 'center',
     flexDirection: 'row',
-    minWidth: 70
+    justifyContent: 'space-between'
   },
-  headerButtonRight: {
+  headerActionLeft: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.xxs,
+    minHeight: 32,
+    minWidth: 72
+  },
+  headerActionRight: {
     alignItems: 'flex-end',
-    minWidth: 70
+    justifyContent: 'center',
+    minHeight: 32,
+    minWidth: 72
   },
-  headerButtonText: {
+  headerActionText: {
     color: colors.primary,
     fontFamily: typography.body,
     fontSize: typography.sizes.title,
     lineHeight: 24
   },
   headerTitle: {
-    color: '#0F172A',
+    color: colors.textPrimary,
     fontFamily: typography.body,
     fontSize: typography.sizes.title,
     fontWeight: '700',
-    maxWidth: 220,
-    textAlign: 'center'
+    lineHeight: 26
   },
-  content: {
+  scrollContent: {
     alignItems: 'center',
-    paddingBottom: 150,
     paddingHorizontal: spacing.md,
-    paddingTop: spacing.md
+    paddingTop: spacing.lg
   },
   mainColumn: {
-    maxWidth: 448,
-    width: '100%'
+    maxWidth: 448
   },
-  pageHeading: {
-    color: '#0F172A',
+  pageTitle: {
+    color: colors.textPrimary,
     fontFamily: typography.display,
     fontSize: typography.sizes.headingXl,
     letterSpacing: -0.85,
-    marginBottom: spacing.xs
+    lineHeight: 43,
+    marginBottom: spacing.md
   },
-  sectionWrap: {
-    marginTop: spacing.sm
+  section: {
+    marginBottom: spacing.md
   },
   sectionLabel: {
-    color: '#8E8E93',
+    color: colors.textSecondary,
     fontFamily: typography.body,
     fontSize: typography.sizes.caption,
-    letterSpacing: 0.3,
+    letterSpacing: 0.325,
     marginBottom: spacing.xs,
-    paddingHorizontal: spacing.sm,
+    paddingHorizontal: spacing.md,
     textTransform: 'uppercase'
   },
-  flatCard: {
-    borderRadius: radius.md
+  card: {
+    backgroundColor: colors.surface,
+    borderColor: colors.borderSubtle,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    overflow: 'hidden',
+    ...shadows.card
   },
   fieldRow: {
     alignItems: 'center',
@@ -524,253 +501,157 @@ const styles = StyleSheet.create({
     minHeight: 48,
     paddingHorizontal: spacing.md
   },
-  fieldLabel: {
+  rowLabel: {
     color: colors.black,
     fontFamily: typography.body,
     fontSize: typography.sizes.title,
-    minWidth: 96
+    lineHeight: 26,
+    width: 96
   },
   rowInput: {
     color: colors.textPrimary,
     flex: 1,
     fontFamily: typography.body,
     fontSize: typography.sizes.title,
+    minHeight: 48,
+    paddingHorizontal: spacing.sm
+  },
+  divider: {
+    backgroundColor: colors.divider,
+    height: StyleSheet.hairlineWidth,
+    marginLeft: spacing.md
+  },
+  chipsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm
   },
-  priceRowRight: {
+  suggestionChip: {
+    backgroundColor: 'rgba(0,122,255,0.1)',
+    borderRadius: 999,
+    marginBottom: spacing.xs,
+    marginRight: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 6
+  },
+  suggestionChipText: {
+    color: colors.primary,
+    fontFamily: typography.body,
+    fontSize: typography.sizes.body,
+    lineHeight: 22
+  },
+  priceInputWrap: {
     alignItems: 'center',
     flex: 1,
     flexDirection: 'row',
     justifyContent: 'flex-end'
   },
   priceInput: {
+    color: colors.primary,
+    fontFamily: typography.body,
+    fontSize: typography.sizes.title,
+    minHeight: 40,
+    paddingHorizontal: spacing.sm,
+    textAlign: 'right',
+    width: 120
+  },
+  currencyLabel: {
+    color: colors.textTertiary,
+    fontFamily: typography.body,
+    fontSize: typography.sizes.title,
+    lineHeight: 26,
+    marginLeft: spacing.xs
+  },
+  dateRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    minHeight: 48,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs
+  },
+  dateInputWrap: {
+    flex: 1,
+    marginBottom: -spacing.sm
+  },
+  storeInputWrap: {
+    alignItems: 'center',
+    flex: 1,
+    flexDirection: 'row'
+  },
+  mapEntryButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 32,
+    minWidth: 32
+  },
+  locationSummaryRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    minHeight: 70,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm
+  },
+  locationBadge: {
+    alignItems: 'center',
+    backgroundColor: colors.surfaceMuted,
+    borderColor: colors.dividerSoft,
+    borderRadius: 8,
+    borderWidth: 1,
+    height: 40,
+    justifyContent: 'center',
+    marginRight: spacing.sm,
+    width: 40
+  },
+  locationTextWrap: {
+    flex: 1
+  },
+  locationPrimaryText: {
     color: colors.textPrimary,
     fontFamily: typography.body,
     fontSize: typography.sizes.title,
-    minWidth: 40,
-    paddingVertical: spacing.sm,
-    textAlign: 'right'
-  },
-  currencyText: {
-    color: colors.textTertiary,
-    fontFamily: typography.body,
-    fontSize: typography.sizes.title,
-    marginLeft: spacing.xs
-  },
-  divider: {
-    backgroundColor: '#C6C6C8',
-    height: 0.5
-  },
-  indentedDivider: {
-    backgroundColor: '#C6C6C8',
-    height: 0.5,
-    marginLeft: spacing.md
-  },
-  quickChipRow: {
-    gap: spacing.xs,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm
-  },
-  trailingRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'flex-end'
-  },
-  trailingValue: {
-    color: '#8E8E93',
-    fontFamily: typography.body,
-    fontSize: typography.sizes.title,
-    marginRight: spacing.xs
-  },
-  dateValue: {
-    color: colors.primary,
-    fontFamily: typography.body,
-    fontSize: typography.sizes.title
-  },
-  dateInputWrap: {
-    marginTop: spacing.xs
-  },
-  fieldAction: {
-    marginLeft: spacing.xs,
-    padding: spacing.xs
-  },
-  locationQuickRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm
-  },
-  locationTile: {
-    backgroundColor: '#E2E8F0',
-    borderColor: '#F1F5F9',
-    borderRadius: 6,
-    borderWidth: 1,
-    height: 40,
-    overflow: 'hidden',
-    width: 40
-  },
-  locationTileMap: {
-    flex: 1,
-    opacity: 0.8
-  },
-  locationQuickMeta: {
-    flex: 1,
-    marginLeft: spacing.sm,
-    marginRight: spacing.sm
-  },
-  locationQuickTitle: {
-    color: colors.black,
-    fontFamily: typography.body,
-    fontSize: typography.sizes.title,
+    fontWeight: '700',
     lineHeight: 24
   },
-  locationQuickSubtitle: {
-    color: '#8E8E93',
+  locationSecondaryText: {
+    color: colors.textSecondary,
     fontFamily: typography.body,
-    fontSize: typography.sizes.caption,
-    lineHeight: 20
+    fontSize: typography.sizes.body,
+    lineHeight: 22,
+    marginTop: 1
   },
-  supportText: {
-    color: '#8E8E93',
+  locationActionText: {
+    color: colors.primary,
+    fontFamily: typography.body,
+    fontSize: typography.sizes.title,
+    lineHeight: 24,
+    marginLeft: spacing.sm
+  },
+  locationRequiredHint: {
+    color: colors.warning,
     fontFamily: typography.body,
     fontSize: typography.sizes.caption,
-    lineHeight: 20,
-    marginTop: spacing.sm,
+    lineHeight: 19,
+    marginTop: spacing.xs,
+    paddingHorizontal: spacing.md
+  },
+  shareHint: {
+    color: colors.textSecondary,
+    fontFamily: typography.body,
+    fontSize: typography.sizes.caption,
+    lineHeight: 19,
+    marginTop: spacing.xs,
+    paddingHorizontal: spacing.md,
     textAlign: 'center'
   },
-  selectedTopSpacing: {
-    height: spacing.xs
-  },
-  detectedCard: {
-    borderRadius: radius.md,
-    padding: spacing.md
-  },
-  detectedRow: {
-    flexDirection: 'row'
-  },
-  productPreviewImage: {
-    backgroundColor: colors.surfaceMuted,
-    borderRadius: radius.md,
-    height: 72,
-    width: 72
-  },
-  detectedContent: {
-    flex: 1,
-    marginLeft: spacing.md
-  },
-  detectedName: {
-    color: colors.black,
-    fontFamily: typography.body,
-    fontSize: typography.sizes.title,
-    fontWeight: '700',
-    lineHeight: 24
-  },
-  detectedSubtitle: {
-    color: colors.textSecondary,
-    fontFamily: typography.body,
-    fontSize: typography.sizes.body,
-    lineHeight: 22
-  },
-  detectedPriceRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    marginTop: spacing.xxs
-  },
-  detectedPrice: {
-    color: colors.black,
-    fontFamily: typography.body,
-    fontSize: typography.sizes.title,
-    fontWeight: '700'
-  },
-  detectedPriceMuted: {
-    color: colors.textTertiary,
-    fontFamily: typography.body,
-    fontSize: typography.sizes.body,
-    marginLeft: spacing.xs,
-    textDecorationLine: 'line-through'
-  },
-  supportTextLeft: {
-    color: colors.textSecondary,
-    fontFamily: typography.body,
-    fontSize: typography.sizes.caption,
-    lineHeight: 20,
-    marginTop: spacing.xs,
-    paddingHorizontal: spacing.sm
-  },
-  mapHeroWrap: {
-    borderTopLeftRadius: radius.md,
-    borderTopRightRadius: radius.md,
-    overflow: 'hidden'
-  },
-  mapHeroImage: {
-    height: 128,
-    justifyContent: 'space-between'
-  },
-  pinWrap: {
-    alignItems: 'center',
-    flex: 1,
-    justifyContent: 'center'
-  },
-  viewMapButton: {
-    alignSelf: 'flex-end',
-    backgroundColor: 'rgba(255,255,255,0.9)',
+  notesCard: {
+    backgroundColor: colors.surface,
     borderColor: colors.borderSubtle,
-    borderRadius: 8,
+    borderRadius: radius.md,
     borderWidth: 1,
-    margin: spacing.xs,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xxs,
-    ...shadows.soft
-  },
-  viewMapText: {
-    color: colors.black,
-    fontFamily: typography.body,
-    fontSize: typography.sizes.micro,
-    lineHeight: 16
-  },
-  locationRowLarge: {
-    alignItems: 'center',
-    borderTopColor: colors.dividerSoft,
-    borderTopWidth: 1,
-    flexDirection: 'row',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md
-  },
-  locationIconCircle: {
-    alignItems: 'center',
-    backgroundColor: colors.primary,
-    borderRadius: 16,
-    height: 32,
-    justifyContent: 'center',
-    width: 32
-  },
-  locationDetails: {
-    flex: 1,
-    marginLeft: spacing.sm,
-    marginRight: spacing.sm
-  },
-  locationName: {
-    color: colors.black,
-    fontFamily: typography.body,
-    fontSize: typography.sizes.title,
-    fontWeight: '700',
-    lineHeight: 24
-  },
-  locationAddress: {
-    color: colors.textSecondary,
-    fontFamily: typography.body,
-    fontSize: typography.sizes.body,
-    lineHeight: 22
-  },
-  changeButton: {
-    paddingHorizontal: spacing.xs,
-    paddingVertical: spacing.xxs
-  },
-  changeButtonText: {
-    color: colors.primary,
-    fontFamily: typography.body,
-    fontSize: typography.sizes.title,
-    lineHeight: 24
+    minHeight: 120,
+    overflow: 'hidden',
+    ...shadows.card
   },
   notesInput: {
     color: colors.textPrimary,
@@ -778,30 +659,47 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.title,
     lineHeight: 28,
     minHeight: 120,
-    padding: spacing.md
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm
   },
-  counterText: {
-    color: colors.textSecondary,
-    fontFamily: typography.body,
-    fontSize: typography.sizes.caption,
-    marginTop: spacing.xs,
-    paddingHorizontal: spacing.sm,
-    textAlign: 'right'
-  },
-  status: {
+  notesCounter: {
     color: colors.textSecondary,
     fontFamily: typography.body,
     fontSize: typography.sizes.caption,
     lineHeight: 20,
-    marginTop: spacing.sm,
-    paddingHorizontal: spacing.sm
+    marginTop: spacing.xs,
+    paddingHorizontal: spacing.md,
+    textAlign: 'right'
   },
-  bottomAction: {
-    backgroundColor: 'rgba(255,255,255,0.85)',
+  statusMessage: {
+    color: colors.textSecondary,
+    fontFamily: typography.body,
+    fontSize: typography.sizes.caption,
+    lineHeight: 19,
+    marginTop: spacing.xs,
+    paddingHorizontal: spacing.md,
+    textAlign: 'center'
+  },
+  bottomBar: {
+    backgroundColor: colors.surfaceOverlay,
     borderTopColor: colors.divider,
     borderTopWidth: 1,
-    paddingBottom: spacing.lg,
+    bottom: 0,
+    left: 0,
     paddingHorizontal: spacing.md,
-    paddingTop: spacing.sm
+    paddingTop: spacing.sm,
+    position: 'absolute',
+    right: 0
+  },
+  bottomBarInner: {
+    alignSelf: 'center',
+    maxWidth: 448
+  },
+  saveButton: {
+    borderRadius: radius.lg,
+    width: '100%'
+  },
+  pressed: {
+    opacity: 0.85
   }
 });

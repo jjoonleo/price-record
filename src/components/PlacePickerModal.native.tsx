@@ -2,6 +2,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Linking,
   Modal,
   Pressable,
   StyleSheet,
@@ -39,6 +40,18 @@ const regionFromCoordinates = (coords: Coordinates): Region => ({
   longitudeDelta: 0.04
 });
 
+const formatWebsiteLabel = (websiteUri?: string): string | null => {
+  if (!websiteUri) {
+    return null;
+  }
+
+  try {
+    return new URL(websiteUri).hostname.replace(/^www\./u, '');
+  } catch {
+    return null;
+  }
+};
+
 const buildFallbackMessage = (status: PlacesApiStatus, t: ReturnType<typeof useI18n>['t']): string | null => {
   if (status.mode !== 'pin-only') {
     return null;
@@ -74,8 +87,11 @@ export const PlacePickerModal = ({
   const [cityArea, setCityArea] = useState(notSelectedLabel);
   const [addressLine, setAddressLine] = useState<string | undefined>();
   const [suggestedStoreName, setSuggestedStoreName] = useState<string | undefined>();
+  const [websiteUri, setWebsiteUri] = useState<string | undefined>();
   const [isResolvingAddress, setIsResolvingAddress] = useState(false);
   const [isInitializingLocation, setIsInitializingLocation] = useState(false);
+  const [isLocatingCurrent, setIsLocatingCurrent] = useState(false);
+  const [locationStatusMessage, setLocationStatusMessage] = useState<string | null>(null);
   const [mapRegion, setMapRegion] = useState<Region>(regionFromCoordinates(initialCoordinates));
   const [selectedSuggestionId, setSelectedSuggestionId] = useState<string | null>(null);
 
@@ -106,6 +122,12 @@ export const PlacePickerModal = ({
     setSearchQuery('');
     setCoordinates(initialCoordinates);
     setMapRegion(regionFromCoordinates(initialCoordinates));
+    setCityArea(notSelectedLabel);
+    setAddressLine(undefined);
+    setSuggestedStoreName(undefined);
+    setWebsiteUri(undefined);
+    setLocationStatusMessage(null);
+    setIsLocatingCurrent(false);
     setSelectedSuggestionId(null);
     setIsInitializingLocation(true);
 
@@ -147,6 +169,7 @@ export const PlacePickerModal = ({
       setCoordinates(nextCoordinates);
       setMapRegion(regionFromCoordinates(nextCoordinates));
       setSuggestedStoreName(details.name || suggestion.primaryText);
+      setWebsiteUri(details.websiteUri);
 
       const reverse = await reverseGeocodeToArea(nextCoordinates);
       setCityArea(reverse.cityArea);
@@ -154,6 +177,8 @@ export const PlacePickerModal = ({
       setSearchQuery(suggestion.primaryText);
     } catch {
       setSuggestedStoreName(suggestion.primaryText);
+      setWebsiteUri(undefined);
+      setSearchQuery(suggestion.primaryText);
     } finally {
       setSelectedSuggestionId(null);
     }
@@ -161,6 +186,8 @@ export const PlacePickerModal = ({
 
   const updateFromMapCoordinate = async (nextCoordinates: Coordinates) => {
     setCoordinates(nextCoordinates);
+    setSuggestedStoreName(undefined);
+    setWebsiteUri(undefined);
     await resolveAddress(nextCoordinates);
   };
 
@@ -181,14 +208,23 @@ export const PlacePickerModal = ({
   };
 
   const handleUseCurrentLocation = async () => {
+    setIsLocatingCurrent(true);
+    setLocationStatusMessage(null);
     const result = await captureCurrentLocation();
     if (result.status === 'granted') {
       setCoordinates(result.coordinates);
       setCityArea(result.cityArea);
       setAddressLine(result.addressLine);
+      setSuggestedStoreName(undefined);
+      setWebsiteUri(undefined);
       setMapRegion(regionFromCoordinates(result.coordinates));
+    } else {
+      setLocationStatusMessage(result.message);
     }
+    setIsLocatingCurrent(false);
   };
+
+  const websiteLabel = formatWebsiteLabel(websiteUri);
 
   return (
     <Modal animationType="slide" presentationStyle="fullScreen" visible={visible}>
@@ -242,11 +278,16 @@ export const PlacePickerModal = ({
             </View>
             {fallbackMessage ? <Text style={styles.helperText}>{fallbackMessage}</Text> : null}
             {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
+            {locationStatusMessage ? <Text style={styles.errorText}>{locationStatusMessage}</Text> : null}
           </View>
 
           <View style={styles.controlsWrap}>
-            <Pressable onPress={handleUseCurrentLocation} style={styles.mapControlButton}>
-              <MaterialCommunityIcons color={colors.primary} name="crosshairs-gps" size={18} />
+            <Pressable disabled={isLocatingCurrent} onPress={handleUseCurrentLocation} style={styles.mapControlButton}>
+              {isLocatingCurrent ? (
+                <ActivityIndicator color={colors.primary} size="small" />
+              ) : (
+                <MaterialCommunityIcons color={colors.primary} name="crosshairs-gps" size={18} />
+              )}
             </Pressable>
             <Pressable onPress={() => setMapRegion(regionFromCoordinates(coordinates))} style={styles.mapControlButton}>
               <MaterialCommunityIcons color={colors.primary} name="navigation-variant" size={18} />
@@ -283,33 +324,67 @@ export const PlacePickerModal = ({
           ) : null}
 
           <View style={styles.sheet}>
-            <View style={styles.sheetHandle} />
-            <View style={styles.sheetHeaderRow}>
-              <View style={styles.sheetTitleWrap}>
-                <Text style={styles.sheetTitle}>{suggestedStoreName || t('selected_place')}</Text>
-                <Text style={styles.sheetSubtitle}>{cityArea}</Text>
+            <View style={styles.sheetHandleWrap}>
+              <View style={styles.sheetHandle} />
+            </View>
+            <View style={styles.sheetBody}>
+              <View style={styles.sheetHeaderRow}>
+                <View style={styles.sheetTitleWrap}>
+                  <Text numberOfLines={1} style={styles.sheetTitle}>
+                    {suggestedStoreName || t('selected_place')}
+                  </Text>
+                  <Text numberOfLines={1} style={styles.sheetMeta}>
+                    {cityArea}
+                  </Text>
+
+                  <View style={styles.detailStack}>
+                    <View style={styles.detailRow}>
+                      <View style={styles.detailIconSlot}>
+                        <MaterialCommunityIcons color={colors.primary} name="map-marker" size={17} />
+                      </View>
+                      <View style={styles.detailTextWrap}>
+                        <Text style={styles.detailPrimary}>{addressLine || t('no_address')}</Text>
+                        <Text style={styles.detailSecondary}>{cityArea}</Text>
+                      </View>
+                    </View>
+
+                    {websiteUri && websiteLabel ? (
+                      <View style={styles.detailRow}>
+                        <View style={styles.detailIconSlot}>
+                          <MaterialCommunityIcons color={colors.textTertiary} name="web" size={17} />
+                        </View>
+                        <Pressable
+                          accessibilityRole="link"
+                          onPress={() => {
+                            void Linking.openURL(websiteUri);
+                          }}
+                          style={({ pressed }) => [pressed && styles.pressed]}
+                        >
+                          <Text numberOfLines={1} style={styles.detailLinkText}>
+                            {websiteLabel}
+                          </Text>
+                        </Pressable>
+                      </View>
+                    ) : null}
+
+                    <View style={styles.detailRow}>
+                      <View style={styles.detailIconSlot}>
+                        <MaterialCommunityIcons color={colors.textTertiary} name="clock-outline" size={17} />
+                      </View>
+                      <Text style={styles.detailSecondary}>{t('compare_open_24h')}</Text>
+                    </View>
+                  </View>
+                </View>
+
+                <Pressable onPress={onClose} style={styles.closeButton}>
+                  <MaterialCommunityIcons color={colors.textSecondary} name="close" size={18} />
+                </Pressable>
               </View>
-              <Pressable onPress={onClose} style={styles.closeButton}>
-                <MaterialCommunityIcons color={colors.textSecondary} name="close" size={18} />
-              </Pressable>
+
+              {isResolvingAddress ? <Text style={styles.loaderText}>{t('resolving_address')}</Text> : null}
+
+              <PrimaryButton label={t('confirm_location')} onPress={handleConfirmSelection} style={styles.confirmButton} />
             </View>
-
-            <View style={styles.detailRow}>
-              <MaterialCommunityIcons color={colors.primary} name="map-marker" size={18} style={styles.detailIcon} />
-              <View style={styles.detailTextWrap}>
-                <Text style={styles.detailPrimary}>{addressLine || t('no_address')}</Text>
-                <Text style={styles.detailSecondary}>{cityArea}</Text>
-              </View>
-            </View>
-
-            <View style={styles.detailRow}>
-              <MaterialCommunityIcons color={colors.textSecondary} name="clock-outline" size={18} style={styles.detailIcon} />
-              <Text style={styles.detailSecondary}>{t('compare_open_24h')}</Text>
-            </View>
-
-            {isResolvingAddress ? <Text style={styles.loaderText}>{t('resolving_address')}</Text> : null}
-
-            <PrimaryButton label={t('confirm_location')} onPress={handleConfirmSelection} style={styles.confirmButton} />
           </View>
         </View>
       </SafeAreaView>
@@ -475,22 +550,28 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 14,
     bottom: 0,
     left: 0,
-    paddingBottom: spacing.md,
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.xs,
     position: 'absolute',
     right: 0,
     ...shadows.floating
   },
+  sheetHandleWrap: {
+    alignItems: 'center',
+    paddingBottom: spacing.xxs,
+    paddingTop: spacing.xs
+  },
   sheetHandle: {
-    alignSelf: 'center',
     backgroundColor: '#D1D1D6',
     borderRadius: 999,
     height: 4,
-    marginBottom: spacing.xs,
     width: 36
   },
+  sheetBody: {
+    paddingBottom: spacing.xl,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.xs
+  },
   sheetHeaderRow: {
+    alignItems: 'flex-start',
     flexDirection: 'row',
     justifyContent: 'space-between'
   },
@@ -502,14 +583,19 @@ const styles = StyleSheet.create({
     color: colors.black,
     fontFamily: typography.display,
     fontSize: typography.sizes.headingMd,
+    letterSpacing: -0.55,
     lineHeight: 28
   },
-  sheetSubtitle: {
+  sheetMeta: {
     color: colors.textSecondary,
     fontFamily: typography.body,
     fontSize: typography.sizes.body,
-    lineHeight: 22,
+    lineHeight: 22.5,
     marginTop: spacing.xxs
+  },
+  detailStack: {
+    marginTop: spacing.xs,
+    rowGap: spacing.sm
   },
   closeButton: {
     alignItems: 'center',
@@ -517,16 +603,16 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     height: 30,
     justifyContent: 'center',
-    marginTop: spacing.xs,
     width: 30
   },
   detailRow: {
-    flexDirection: 'row',
-    marginTop: spacing.sm
+    alignItems: 'center',
+    flexDirection: 'row'
   },
-  detailIcon: {
+  detailIconSlot: {
+    alignItems: 'center',
     marginRight: spacing.sm,
-    marginTop: 1
+    width: 28
   },
   detailTextWrap: {
     flex: 1
@@ -535,15 +621,24 @@ const styles = StyleSheet.create({
     color: colors.black,
     fontFamily: typography.body,
     fontSize: typography.sizes.title,
-    lineHeight: 24
+    lineHeight: 23.4
   },
   detailSecondary: {
     color: colors.textSecondary,
     fontFamily: typography.body,
     fontSize: typography.sizes.body,
-    lineHeight: 21
+    lineHeight: 20.63
+  },
+  detailLinkText: {
+    color: colors.primary,
+    fontFamily: typography.body,
+    fontSize: typography.sizes.body,
+    lineHeight: 20.63
   },
   confirmButton: {
-    marginTop: spacing.lg
+    marginTop: spacing.xl
+  },
+  pressed: {
+    opacity: 0.8
   }
 });

@@ -32,7 +32,19 @@ type PlacePickerModalProps = {
   onConfirm: (selection: PlaceSelection) => void;
 };
 
-const buildFallbackMessage = (status: PlacesApiStatus, t: (key: any) => string): string | null => {
+const formatWebsiteLabel = (websiteUri?: string): string | null => {
+  if (!websiteUri) {
+    return null;
+  }
+
+  try {
+    return new URL(websiteUri).hostname.replace(/^www\./u, '');
+  } catch {
+    return null;
+  }
+};
+
+const buildFallbackMessage = (status: PlacesApiStatus, t: ReturnType<typeof useI18n>['t']): string | null => {
   if (status.mode !== 'pin-only') {
     return null;
   }
@@ -54,10 +66,13 @@ export const PlacePickerModal = ({ visible, initialCoordinates, onClose, onConfi
   const [cityArea, setCityArea] = useState(notSelectedLabel);
   const [addressLine, setAddressLine] = useState<string | undefined>();
   const [suggestedStoreName, setSuggestedStoreName] = useState<string | undefined>();
+  const [websiteUri, setWebsiteUri] = useState<string | undefined>();
   const [isResolvingAddress, setIsResolvingAddress] = useState(false);
   const [selectedSuggestionId, setSelectedSuggestionId] = useState<string | null>(null);
   const [mapError, setMapError] = useState<string | null>(null);
   const [isInitializingLocation, setIsInitializingLocation] = useState(false);
+  const [isLocatingCurrent, setIsLocatingCurrent] = useState(false);
+  const [locationStatusMessage, setLocationStatusMessage] = useState<string | null>(null);
 
   const mapNodeRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<any | null>(null);
@@ -72,6 +87,7 @@ export const PlacePickerModal = ({ visible, initialCoordinates, onClose, onConfi
         setAddressLine(reverse.addressLine);
       } catch {
         setCityArea(notSelectedLabel);
+        setAddressLine(undefined);
       } finally {
         setIsResolvingAddress(false);
       }
@@ -85,6 +101,12 @@ export const PlacePickerModal = ({ visible, initialCoordinates, onClose, onConfi
     setApiStatus(getInitialPlacesApiStatus());
     setSearchQuery('');
     setCoordinates(initialCoordinates);
+    setCityArea(notSelectedLabel);
+    setAddressLine(undefined);
+    setSuggestedStoreName(undefined);
+    setWebsiteUri(undefined);
+    setLocationStatusMessage(null);
+    setIsLocatingCurrent(false);
     setSelectedSuggestionId(null);
     setMapError(null);
     setIsInitializingLocation(true);
@@ -95,6 +117,8 @@ export const PlacePickerModal = ({ visible, initialCoordinates, onClose, onConfi
         setCoordinates(locationResult.coordinates);
         setCityArea(locationResult.cityArea);
         setAddressLine(locationResult.addressLine);
+        setSuggestedStoreName(undefined);
+        setWebsiteUri(undefined);
       } else {
         await resolveAddress(initialCoordinates);
       }
@@ -141,6 +165,8 @@ export const PlacePickerModal = ({ visible, initialCoordinates, onClose, onConfi
         marker.on('dragend', () => {
           const next = marker.getLatLng();
           const nextCoordinates = { latitude: next.lat, longitude: next.lng };
+          setSuggestedStoreName(undefined);
+          setWebsiteUri(undefined);
           setCoordinates(nextCoordinates);
           void resolveAddress(nextCoordinates);
         });
@@ -148,6 +174,8 @@ export const PlacePickerModal = ({ visible, initialCoordinates, onClose, onConfi
         map.on('click', (event: any) => {
           const nextCoordinates = { latitude: event.latlng.lat, longitude: event.latlng.lng };
           marker.setLatLng([nextCoordinates.latitude, nextCoordinates.longitude]);
+          setSuggestedStoreName(undefined);
+          setWebsiteUri(undefined);
           setCoordinates(nextCoordinates);
           void resolveAddress(nextCoordinates);
         });
@@ -207,9 +235,14 @@ export const PlacePickerModal = ({ visible, initialCoordinates, onClose, onConfi
       const nextCoordinates = { latitude: details.latitude, longitude: details.longitude };
       setCoordinates(nextCoordinates);
       setSuggestedStoreName(details.name || suggestion.primaryText);
+      setWebsiteUri(details.websiteUri);
       const reverse = await reverseGeocodeToArea(nextCoordinates);
       setCityArea(reverse.cityArea);
       setAddressLine(details.address || reverse.addressLine);
+      setSearchQuery(suggestion.primaryText);
+    } catch {
+      setSuggestedStoreName(suggestion.primaryText);
+      setWebsiteUri(undefined);
       setSearchQuery(suggestion.primaryText);
     } finally {
       setSelectedSuggestionId(null);
@@ -217,13 +250,22 @@ export const PlacePickerModal = ({ visible, initialCoordinates, onClose, onConfi
   };
 
   const handleUseCurrentLocation = async () => {
+    setIsLocatingCurrent(true);
+    setLocationStatusMessage(null);
     const result = await captureCurrentLocation();
     if (result.status === 'granted') {
       setCoordinates(result.coordinates);
       setCityArea(result.cityArea);
       setAddressLine(result.addressLine);
+      setSuggestedStoreName(undefined);
+      setWebsiteUri(undefined);
+    } else {
+      setLocationStatusMessage(result.message);
     }
+    setIsLocatingCurrent(false);
   };
+
+  const websiteLabel = formatWebsiteLabel(websiteUri);
 
   const handleConfirmSelection = () => {
     onConfirm({
@@ -278,11 +320,16 @@ export const PlacePickerModal = ({ visible, initialCoordinates, onClose, onConfi
             </View>
             {fallbackMessage ? <Text style={styles.helperText}>{fallbackMessage}</Text> : null}
             {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
+            {locationStatusMessage ? <Text style={styles.errorText}>{locationStatusMessage}</Text> : null}
           </View>
 
           <View style={styles.controlsWrap}>
-            <Pressable onPress={handleUseCurrentLocation} style={styles.mapControlButton}>
-              <MaterialCommunityIcons color={colors.primary} name="crosshairs-gps" size={18} />
+            <Pressable disabled={isLocatingCurrent} onPress={handleUseCurrentLocation} style={styles.mapControlButton}>
+              {isLocatingCurrent ? (
+                <ActivityIndicator color={colors.primary} size="small" />
+              ) : (
+                <MaterialCommunityIcons color={colors.primary} name="crosshairs-gps" size={18} />
+              )}
             </Pressable>
             <Pressable onPress={recenterMap} style={styles.mapControlButton}>
               <MaterialCommunityIcons color={colors.primary} name="navigation-variant" size={18} />
@@ -310,33 +357,69 @@ export const PlacePickerModal = ({ visible, initialCoordinates, onClose, onConfi
           {mapError ? <Text style={styles.mapError}>{mapError}</Text> : null}
 
           <View style={styles.sheet}>
-            <View style={styles.sheetHandle} />
-            <View style={styles.sheetHeaderRow}>
-              <View style={styles.sheetTitleWrap}>
-                <Text style={styles.sheetTitle}>{suggestedStoreName || t('selected_place')}</Text>
-                <Text style={styles.sheetSubtitle}>{cityArea}</Text>
+            <View style={styles.sheetHandleWrap}>
+              <View style={styles.sheetHandle} />
+            </View>
+            <View style={styles.sheetBody}>
+              <View style={styles.sheetHeaderRow}>
+                <View style={styles.sheetTitleWrap}>
+                  <Text numberOfLines={1} style={styles.sheetTitle}>
+                    {suggestedStoreName || t('selected_place')}
+                  </Text>
+                  <Text numberOfLines={1} style={styles.sheetMeta}>
+                    {cityArea}
+                  </Text>
+
+                  <View style={styles.detailStack}>
+                    <View style={styles.detailRow}>
+                      <View style={styles.detailIconSlot}>
+                        <MaterialCommunityIcons color={colors.primary} name="map-marker" size={17} />
+                      </View>
+                      <View style={styles.detailTextWrap}>
+                        <Text style={styles.detailPrimary}>{addressLine || t('no_address')}</Text>
+                        <Text style={styles.detailSecondary}>{cityArea}</Text>
+                      </View>
+                    </View>
+
+                    {websiteUri && websiteLabel ? (
+                      <View style={styles.detailRow}>
+                        <View style={styles.detailIconSlot}>
+                          <MaterialCommunityIcons color={colors.textTertiary} name="web" size={17} />
+                        </View>
+                        <Pressable
+                          accessibilityRole="link"
+                          onPress={() => {
+                            if (typeof window !== 'undefined') {
+                              window.open(websiteUri, '_blank', 'noopener,noreferrer');
+                            }
+                          }}
+                          style={({ pressed }) => [pressed && styles.pressed]}
+                        >
+                          <Text numberOfLines={1} style={styles.detailLinkText}>
+                            {websiteLabel}
+                          </Text>
+                        </Pressable>
+                      </View>
+                    ) : null}
+
+                    <View style={styles.detailRow}>
+                      <View style={styles.detailIconSlot}>
+                        <MaterialCommunityIcons color={colors.textTertiary} name="clock-outline" size={17} />
+                      </View>
+                      <Text style={styles.detailSecondary}>{t('compare_open_24h')}</Text>
+                    </View>
+                  </View>
+                </View>
+
+                <Pressable onPress={onClose} style={styles.closeButton}>
+                  <MaterialCommunityIcons color={colors.textSecondary} name="close" size={18} />
+                </Pressable>
               </View>
-              <Pressable onPress={onClose} style={styles.closeButton}>
-                <MaterialCommunityIcons color={colors.textSecondary} name="close" size={18} />
-              </Pressable>
+
+              {isResolvingAddress ? <Text style={styles.loaderText}>{t('resolving_address')}</Text> : null}
+
+              <PrimaryButton label={t('confirm_location')} onPress={handleConfirmSelection} style={styles.confirmButton} />
             </View>
-
-            <View style={styles.detailRow}>
-              <MaterialCommunityIcons color={colors.primary} name="map-marker" size={18} style={styles.detailIcon} />
-              <View style={styles.detailTextWrap}>
-                <Text style={styles.detailPrimary}>{addressLine || t('no_address')}</Text>
-                <Text style={styles.detailSecondary}>{cityArea}</Text>
-              </View>
-            </View>
-
-            <View style={styles.detailRow}>
-              <MaterialCommunityIcons color={colors.textSecondary} name="clock-outline" size={18} style={styles.detailIcon} />
-              <Text style={styles.detailSecondary}>{t('compare_open_24h')}</Text>
-            </View>
-
-            {isResolvingAddress ? <Text style={styles.loaderText}>{t('resolving_address')}</Text> : null}
-
-            <PrimaryButton label={t('confirm_location')} onPress={handleConfirmSelection} style={styles.confirmButton} />
           </View>
         </View>
       </SafeAreaView>
@@ -388,13 +471,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     rowGap: spacing.sm,
-    backgroundColor: 'rgba(255,255,255,0.35)'
+    backgroundColor: 'rgba(255,255,255,0.35)',
+    zIndex: 20
   },
   searchWrap: {
     position: 'absolute',
     left: spacing.md,
     right: spacing.md,
-    top: spacing.md
+    top: spacing.md,
+    zIndex: 30
   },
   searchInputShell: {
     alignItems: 'center',
@@ -434,7 +519,8 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     position: 'absolute',
     right: spacing.md,
-    top: 108
+    top: 108,
+    zIndex: 30
   },
   mapControlButton: {
     alignItems: 'center',
@@ -455,6 +541,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: spacing.md,
     top: 66,
+    zIndex: 40,
     ...shadows.card
   },
   suggestionItem: {
@@ -493,7 +580,8 @@ const styles = StyleSheet.create({
     left: spacing.md,
     position: 'absolute',
     right: spacing.md,
-    textAlign: 'center'
+    textAlign: 'center',
+    zIndex: 45
   },
   sheet: {
     backgroundColor: colors.white,
@@ -501,22 +589,29 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 14,
     bottom: 0,
     left: 0,
-    paddingBottom: spacing.md,
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.xs,
     position: 'absolute',
     right: 0,
+    zIndex: 35,
     ...shadows.floating
   },
+  sheetHandleWrap: {
+    alignItems: 'center',
+    paddingBottom: spacing.xxs,
+    paddingTop: spacing.xs
+  },
   sheetHandle: {
-    alignSelf: 'center',
     backgroundColor: '#D1D1D6',
     borderRadius: 999,
     height: 4,
-    marginBottom: spacing.xs,
     width: 36
   },
+  sheetBody: {
+    paddingBottom: spacing.xl,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.xs
+  },
   sheetHeaderRow: {
+    alignItems: 'flex-start',
     flexDirection: 'row',
     justifyContent: 'space-between'
   },
@@ -528,14 +623,19 @@ const styles = StyleSheet.create({
     color: colors.black,
     fontFamily: typography.display,
     fontSize: typography.sizes.headingMd,
+    letterSpacing: -0.55,
     lineHeight: 28
   },
-  sheetSubtitle: {
+  sheetMeta: {
     color: colors.textSecondary,
     fontFamily: typography.body,
     fontSize: typography.sizes.body,
-    lineHeight: 22,
+    lineHeight: 22.5,
     marginTop: spacing.xxs
+  },
+  detailStack: {
+    marginTop: spacing.xs,
+    rowGap: spacing.sm
   },
   closeButton: {
     alignItems: 'center',
@@ -543,16 +643,16 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     height: 30,
     justifyContent: 'center',
-    marginTop: spacing.xs,
     width: 30
   },
   detailRow: {
-    flexDirection: 'row',
-    marginTop: spacing.sm
+    alignItems: 'center',
+    flexDirection: 'row'
   },
-  detailIcon: {
+  detailIconSlot: {
+    alignItems: 'center',
     marginRight: spacing.sm,
-    marginTop: 1
+    width: 28
   },
   detailTextWrap: {
     flex: 1
@@ -561,20 +661,35 @@ const styles = StyleSheet.create({
     color: colors.black,
     fontFamily: typography.body,
     fontSize: typography.sizes.title,
-    lineHeight: 24
+    lineHeight: 23.4
   },
   detailSecondary: {
     color: colors.textSecondary,
     fontFamily: typography.body,
     fontSize: typography.sizes.body,
-    lineHeight: 21
+    lineHeight: 20.63
+  },
+  detailLinkText: {
+    color: colors.primary,
+    fontFamily: typography.body,
+    fontSize: typography.sizes.body,
+    lineHeight: 20.63
   },
   confirmButton: {
-    marginTop: spacing.lg
+    marginTop: spacing.xl
+  },
+  pressed: {
+    opacity: 0.8
   }
 });
 
 const mapStyle: CSSProperties = {
+  bottom: 0,
+  left: 0,
+  position: 'absolute',
+  right: 0,
+  top: 0,
   width: '100%',
-  height: '100%'
+  height: '100%',
+  zIndex: 0
 };
