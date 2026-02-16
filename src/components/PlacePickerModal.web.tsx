@@ -331,9 +331,6 @@ export const PlacePickerModal = ({ visible, initialCoordinates, onClose, onConfi
                 <MaterialCommunityIcons color={colors.primary} name="crosshairs-gps" size={18} />
               )}
             </Pressable>
-            <Pressable onPress={recenterMap} style={styles.mapControlButton}>
-              <MaterialCommunityIcons color={colors.primary} name="navigation-variant" size={18} />
-            </Pressable>
           </View>
 
           {apiStatus.mode === 'search-enabled' && (isSearchLoading || suggestions.length > 0) ? (
