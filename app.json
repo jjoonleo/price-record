@@ -3,6 +3,8 @@
     "name": "Japan Price Tracker",
     "slug": "japan-price-tracker",
     "version": "1.0.0",
+    "backgroundColor": "#EAF5FF",
+    "primaryColor": "#12243B",
     "orientation": "portrait",
     "scheme": "japan-price-tracker",
     "userInterfaceStyle": "light",
@@ -21,6 +23,10 @@
       ],
       "expo-localization"
     ],
+    "web": {
+      "output": "static",
+      "bundler": "metro"
+    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.ejunpark.japanpricetracker"

@@ -35,6 +35,34 @@ React Native (Expo + TypeScript) app to record merchandise prices across Japanes
    ```
 3. Open on iOS/Android via Expo.
 
+## Webapp PWA Build
+
+Use the webapp build pipeline for installable/offline-ready web output:
+
+```bash
+npm run build:webapp
+```
+
+Build artifact:
+
+- `web-build/`
+
+Versioned cache invalidation:
+
+- Bump `version` in `package.json` before production deploy.
+- The service worker cache namespace is tied to package version.
+
+Static-host deployment requirements:
+
+- Serve `sw.js` with `Cache-Control: no-cache`.
+- Serve `manifest.json` with JSON/manifest content type.
+- Keep long-cache headers enabled for hashed static assets.
+
+Expected runtime behavior:
+
+- First-ever load requires network.
+- Repeat visits (and installed app shell) work offline after initial successful load.
+
 ## Google Place Search Setup
 
 Map selection works without a key (pin-only mode).  

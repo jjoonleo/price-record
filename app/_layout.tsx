@@ -55,6 +55,7 @@ export default function RootLayout() {
 
   return (
     <Tabs
+      initialRouteName="compare"
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarActiveTintColor: colors.ink900,
