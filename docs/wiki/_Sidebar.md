@@ -8,6 +8,7 @@
 - [Location, Maps, and Places Integration](./Location-Maps-and-Places-Integration.md)
 - [Ranking Engine and Decision Logic](./Ranking-Engine-and-Decision-Logic.md)
 - [State, i18n, and Platform Variants](./State-I18n-and-Platform-Variants.md)
+- [AI Agent Component Development Playbook](./AI-Agent-Component-Development-Playbook.md)
 - [Developer Rules and Engineering Standards](./Developer-Rules-and-Engineering-Standards.md)
 - [Testing, QA, and Regression Checklist](./Testing-QA-and-Regression-Checklist.md)
 - [Release Runbook and Troubleshooting](./Release-Runbook-and-Troubleshooting.md)

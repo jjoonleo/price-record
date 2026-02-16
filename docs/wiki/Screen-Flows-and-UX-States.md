@@ -78,8 +78,17 @@ Required states:
 
 ## Place Picker Modal Behavior
 Capture screen delegates location selection to platform-specific modal:
-- Native: interactive map with draggable/press marker and optional Places search.
-- Web: search + summary/card flow with current-location action, non-interactive map alternative.
+- Native: interactive `react-native-maps` picker + Places search + current-location controls.
+- Web: interactive Leaflet picker + Places search + current-location controls.
+
+State boundary:
+- Feature state is scoped per modal session via `PlacePickerStoreProvider`.
+- Async orchestration (initialize/search/hydration/select/current-location/confirm payload) lives in `usePlacePickerController` + store actions.
+- UI-only state (sheet animation, map refs, focus panel visibility) stays in platform modal components.
+
+At-a-glance layout reference:
+- Open `src/components/placePicker/PlacePickerLayoutBlueprint.web.tsx` for a compact semantic anatomy (`main/section/header/aside/footer`) of the place picker screen.
+- Use this file as the first-stop map before reading platform modal wiring.
 
 Selection contract:
 - Confirm returns `PlaceSelection` payload:
