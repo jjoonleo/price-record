@@ -95,6 +95,7 @@ export const PlacePickerModal = ({
   const [apiStatus, setApiStatus] = useState<PlacesApiStatus>({ mode: 'pin-only', reason: 'missing-key' });
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const [keepSuggestionPanelVisible, setKeepSuggestionPanelVisible] = useState(false);
   const [coordinates, setCoordinates] = useState<Coordinates>(initialCoordinates);
   const [cityArea, setCityArea] = useState(notSelectedLabel);
   const [addressLine, setAddressLine] = useState<string | undefined>();
@@ -299,6 +300,7 @@ export const PlacePickerModal = ({
     setIsLocatingCurrent(false);
     setSelectedSuggestionId(null);
     setIsSearchFocused(false);
+    setKeepSuggestionPanelVisible(false);
     suppressSearchBlurRef.current = false;
     setMapError(null);
     setIsInitializingLocation(true);
@@ -381,10 +383,18 @@ export const PlacePickerModal = ({
           const { isVisible, hasPlaceInfo } = mapTapStateRef.current;
           if (isVisible) {
             hidePlaceInfoSheetRef.current();
-          } else if (hasPlaceInfo) {
-            showPlaceInfoSheetRef.current();
           }
+          setKeepSuggestionPanelVisible(false);
           setIsSearchFocused(false);
+        });
+        marker.on('click', (event: any) => {
+          L.DomEvent.stopPropagation(event);
+          if (!mapTapStateRef.current.hasPlaceInfo) {
+            return;
+          }
+          setKeepSuggestionPanelVisible(false);
+          setIsSearchFocused(false);
+          showPlaceInfoSheetRef.current();
         });
 
         mapRef.current = map;
@@ -502,6 +512,7 @@ export const PlacePickerModal = ({
   const handleSuggestionSelect = async (suggestion: PlaceSuggestion) => {
     try {
       setIsSearchFocused(false);
+      setKeepSuggestionPanelVisible(false);
       suppressSearchBlurRef.current = false;
       setSelectedSuggestionId(suggestion.placeId);
       const details = await getPlaceDetails(suggestion.placeId);
@@ -594,12 +605,6 @@ export const PlacePickerModal = ({
   return (
     <Modal animationType="slide" presentationStyle="fullScreen" visible={visible}>
       <SafeAreaView edges={['top', 'left', 'right', 'bottom']} style={styles.screen}>
-        <View style={styles.header}>
-          <Pressable onPress={onClose} style={styles.headerAction}><Text style={styles.headerActionText}>{t('cancel')}</Text></Pressable>
-          <Text style={styles.headerTitle}>{t('pick_place')}</Text>
-          <Pressable onPress={handleConfirmSelection} style={styles.headerActionRight}><Text style={styles.headerConfirmText}>{t('confirm')}</Text></Pressable>
-        </View>
-
         <View style={styles.mapShell}>
           <div ref={mapNodeRef} style={mapStyle} />
           {isInitializingLocation ? (
@@ -610,29 +615,84 @@ export const PlacePickerModal = ({
           ) : null}
 
           <View style={styles.searchWrap}>
-            <View style={styles.searchInputShell}>
-              <MaterialCommunityIcons color={colors.textSecondary} name="magnify" size={16} style={styles.searchIcon} />
-              <TextInput
-                editable={apiStatus.mode === 'search-enabled'}
-                onChangeText={setSearchQuery}
-                onBlur={() => {
-                  if (suppressSearchBlurRef.current) {
-                    suppressSearchBlurRef.current = false;
-                    return;
-                  }
-                  setIsSearchFocused(false);
-                }}
-                onFocus={() => setIsSearchFocused(true)}
-                placeholder={t('search_placeholder_short')}
-                placeholderTextColor={colors.textSecondary}
-                style={styles.searchInput}
-                value={searchQuery}
-              />
-              <MaterialCommunityIcons color={colors.textSecondary} name="microphone-outline" size={16} />
+            <View style={styles.searchRow}>
+              <Pressable onPress={onClose} style={styles.backButton}>
+                <MaterialCommunityIcons color={colors.textPrimary} name="chevron-left" size={26} />
+              </Pressable>
+              <View style={styles.searchInputShell}>
+                {!isSearchFocused ? (
+                  <MaterialCommunityIcons color={colors.textSecondary} name="magnify" size={16} style={styles.searchIcon} />
+                ) : null}
+                <TextInput
+                  editable={apiStatus.mode === 'search-enabled'}
+                  onChangeText={setSearchQuery}
+                  onBlur={() => {
+                    if (suppressSearchBlurRef.current) {
+                      suppressSearchBlurRef.current = false;
+                      return;
+                    }
+                    setIsSearchFocused(false);
+                  }}
+                  onFocus={() => {
+                    setIsSearchFocused(true);
+                    setKeepSuggestionPanelVisible(false);
+                  }}
+                  blurOnSubmit={false}
+                  onSubmitEditing={() => {
+                    hidePlaceInfoSheet();
+                    setKeepSuggestionPanelVisible(true);
+                  }}
+                  placeholder={t('search_placeholder_short')}
+                  placeholderTextColor={colors.textSecondary}
+                  style={styles.searchInput}
+                  value={searchQuery}
+                />
+                {searchQuery.trim().length > 0 ? (
+                  <Pressable
+                    accessibilityLabel="Clear search"
+                    onPress={() => {
+                      setSearchQuery('');
+                      setKeepSuggestionPanelVisible(false);
+                    }}
+                    style={styles.searchClearButton}
+                  >
+                    <MaterialCommunityIcons color={colors.textSecondary} name="close-circle" size={16} />
+                  </Pressable>
+                ) : null}
+              </View>
             </View>
             {fallbackMessage ? <Text style={styles.helperText}>{fallbackMessage}</Text> : null}
             {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
             {locationStatusMessage ? <Text style={styles.errorText}>{locationStatusMessage}</Text> : null}
+            {apiStatus.mode === 'search-enabled' &&
+            (isSearchFocused || keepSuggestionPanelVisible) &&
+            (isSearchLoading || suggestions.length > 0) ? (
+              <View style={styles.suggestionPanel}>
+                {isSearchLoading ? (
+                  <View style={styles.loaderRow}>
+                    <ActivityIndicator color={colors.primary} size="small" />
+                    <Text style={styles.loaderText}>{t('searching_places')}</Text>
+                  </View>
+                ) : (
+                  <ScrollView keyboardShouldPersistTaps="handled">
+                    {suggestions.map((suggestion) => (
+                      <Pressable
+                        key={suggestion.placeId}
+                        onPressIn={() => {
+                          suppressSearchBlurRef.current = true;
+                        }}
+                        onPress={() => void handleSuggestionSelect(suggestion)}
+                        style={styles.suggestionItem}
+                      >
+                        <Text style={styles.suggestionPrimary}>{suggestion.primaryText}</Text>
+                        {suggestion.secondaryText ? <Text style={styles.suggestionSecondary}>{suggestion.secondaryText}</Text> : null}
+                        {selectedSuggestionId === suggestion.placeId ? <Text style={styles.loaderText}>{t('applying')}</Text> : null}
+                      </Pressable>
+                    ))}
+                  </ScrollView>
+                )}
+              </View>
+            ) : null}
           </View>
 
           <Animated.View
@@ -652,31 +712,6 @@ export const PlacePickerModal = ({
               )}
             </Pressable>
           </Animated.View>
-
-          {apiStatus.mode === 'search-enabled' && isSearchFocused && (isSearchLoading || suggestions.length > 0) ? (
-            <View style={styles.suggestionPanel}>
-              {isSearchLoading ? (
-                <View style={styles.loaderRow}><ActivityIndicator color={colors.primary} size="small" /><Text style={styles.loaderText}>{t('searching_places')}</Text></View>
-              ) : (
-                <ScrollView keyboardShouldPersistTaps="handled">
-                  {suggestions.map((suggestion) => (
-                    <Pressable
-                      key={suggestion.placeId}
-                      onPressIn={() => {
-                        suppressSearchBlurRef.current = true;
-                      }}
-                      onPress={() => void handleSuggestionSelect(suggestion)}
-                      style={styles.suggestionItem}
-                    >
-                      <Text style={styles.suggestionPrimary}>{suggestion.primaryText}</Text>
-                      {suggestion.secondaryText ? <Text style={styles.suggestionSecondary}>{suggestion.secondaryText}</Text> : null}
-                      {selectedSuggestionId === suggestion.placeId ? <Text style={styles.loaderText}>{t('applying')}</Text> : null}
-                    </Pressable>
-                  ))}
-                </ScrollView>
-              )}
-            </View>
-          ) : null}
 
           {mapError ? <Text style={styles.mapError}>{mapError}</Text> : null}
 
@@ -736,12 +771,6 @@ export const PlacePickerModal = ({
                       </View>
                     ) : null}
 
-                    <View style={styles.detailRow}>
-                      <View style={styles.detailIconSlot}>
-                        <MaterialCommunityIcons color={colors.textTertiary} name="clock-outline" size={17} />
-                      </View>
-                      <Text style={styles.detailSecondary}>{t('compare_open_24h')}</Text>
-                    </View>
                   </View>
                 </View>
 
@@ -763,39 +792,6 @@ export const PlacePickerModal = ({
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.white },
-  header: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.95)',
-    borderBottomColor: 'rgba(198,198,200,0.5)',
-    borderBottomWidth: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    minHeight: 50,
-    paddingHorizontal: spacing.md,
-    paddingBottom: spacing.xs
-  },
-  headerAction: { minWidth: 76 },
-  headerActionRight: { minWidth: 76, alignItems: 'flex-end' },
-  headerActionText: {
-    color: colors.primary,
-    fontFamily: typography.body,
-    fontSize: typography.sizes.title,
-    lineHeight: 26
-  },
-  headerTitle: {
-    color: colors.black,
-    fontFamily: typography.body,
-    fontSize: typography.sizes.title,
-    fontWeight: '700',
-    lineHeight: 26
-  },
-  headerConfirmText: {
-    color: colors.primary,
-    fontFamily: typography.body,
-    fontSize: typography.sizes.title,
-    fontWeight: '700',
-    lineHeight: 26
-  },
   mapShell: {
     flex: 1,
     position: 'relative'
@@ -815,11 +811,28 @@ const styles = StyleSheet.create({
     top: spacing.md,
     zIndex: 30
   },
+  searchRow: {
+    alignItems: 'center',
+    width: '100%',
+    flexDirection: 'row',
+    columnGap: spacing.xs
+  },
+  backButton: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(227,227,232,0.8)',
+    borderRadius: radius.lg,
+    height: 44,
+    justifyContent: 'center',
+    width: 44,
+    ...shadows.soft
+  },
   searchInputShell: {
     alignItems: 'center',
     backgroundColor: 'rgba(227,227,232,0.8)',
     borderRadius: radius.lg,
+    flex: 1,
     flexDirection: 'row',
+    minWidth: 0,
     minHeight: 44,
     paddingHorizontal: spacing.sm,
     ...shadows.soft
@@ -833,6 +846,12 @@ const styles = StyleSheet.create({
     fontFamily: typography.body,
     fontSize: typography.sizes.title,
     lineHeight: 24
+  },
+  searchClearButton: {
+    alignItems: 'center',
+    height: 28,
+    justifyContent: 'center',
+    width: 28
   },
   helperText: {
     color: colors.white,
@@ -870,11 +889,8 @@ const styles = StyleSheet.create({
     borderColor: colors.borderSubtle,
     borderRadius: radius.lg,
     borderWidth: 1,
-    left: spacing.md,
+    marginTop: spacing.xs,
     maxHeight: 220,
-    position: 'absolute',
-    right: spacing.md,
-    top: 66,
     zIndex: 40,
     ...shadows.card
   },
