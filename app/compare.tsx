@@ -27,6 +27,7 @@ import { useFiltersStore } from '../src/state/useFiltersStore';
 import { colors, spacing, typography } from '../src/theme/tokens';
 import { Coordinates, HistoryEntry, ProductOption, StoreComparison } from '../src/types/domain';
 import { compactStoreLabel, formatYen } from '../src/utils/formatters';
+import { buildProductPriceDetailRouteParams } from '../src/utils/productPriceDetail';
 
 const historyBarColors = [colors.primary, 'rgba(88,86,214,0.6)', 'rgba(156,163,175,0.6)'] as const;
 
@@ -177,6 +178,11 @@ export default function CompareScreen() {
     [historyPeakPrice, minHistoryPrice]
   );
 
+  const selectedProduct = useMemo(
+    () => products.find((product) => product.id === selectedProductId) ?? null,
+    [products, selectedProductId]
+  );
+
   const handleSelectProduct = useCallback(
     (productId: string) => {
       if (productId === selectedProductId) {
@@ -210,6 +216,24 @@ export default function CompareScreen() {
       return [...previous, storeId];
     });
   };
+
+  const goToDetail = useCallback(
+    (item: StoreComparison) => {
+      if (!selectedProduct) {
+        setStatusMessage(t('no_item_selected'));
+        return;
+      }
+
+      router.navigate({
+        pathname: '/product-price-detail',
+        params: buildProductPriceDetailRouteParams(item, {
+          id: selectedProduct.id,
+          name: selectedProduct.name
+        })
+      });
+    },
+    [router, selectedProduct, t]
+  );
 
   return (
     <SafeAreaView edges={['top']} style={styles.screen}>
@@ -286,32 +310,38 @@ export default function CompareScreen() {
                   </Pressable>
                 </View>
 
-                <View style={styles.bestCardInfoRow}>
-                  <View style={styles.bestStoreMeta}>
-                    <Text numberOfLines={1} style={styles.bestStoreName}>
-                      {topChoice.storeName}
-                    </Text>
-                    <View style={styles.bestStoreSubRow}>
-                      <MaterialCommunityIcons color={colors.textTertiary} name="map-marker" size={13} />
-                      <Text numberOfLines={1} style={styles.bestStoreSubText}>
-                        {topChoice.cityArea} {'  '}• {'  '}
-                        {toDistanceLabel(topChoice.distanceKm, hasLocation, t('compare_distance_unavailable'))}
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => goToDetail(topChoice)}
+                  style={({ pressed }) => [styles.bestCardInfoPressable, pressed && styles.pressed]}
+                >
+                  <View style={styles.bestCardInfoRow}>
+                    <View style={styles.bestStoreMeta}>
+                      <Text numberOfLines={1} style={styles.bestStoreName}>
+                        {topChoice.storeName}
                       </Text>
+                      <View style={styles.bestStoreSubRow}>
+                        <MaterialCommunityIcons color={colors.textTertiary} name="map-marker" size={13} />
+                        <Text numberOfLines={1} style={styles.bestStoreSubText}>
+                          {topChoice.cityArea} {'  '}• {'  '}
+                          {toDistanceLabel(topChoice.distanceKm, hasLocation, t('compare_distance_unavailable'))}
+                        </Text>
+                      </View>
                     </View>
+                    <Text style={styles.bestStorePrice}>{toPriceLabel(topChoice.latestPriceYen, locale)}</Text>
                   </View>
-                  <Text style={styles.bestStorePrice}>{toPriceLabel(topChoice.latestPriceYen, locale)}</Text>
-                </View>
+                </Pressable>
 
                 <View style={styles.bestActionsRow}>
                   <PrimaryButton
                     label={t('compare_navigate')}
-                    onPress={() => setStatusMessage(t('compare_nav_pending'))}
+                    onPress={() => goToDetail(topChoice)}
                     style={styles.navigateButton}
                     textStyle={styles.navigateButtonText}
                   />
                   <Pressable
                     accessibilityRole="button"
-                    onPress={() => setStatusMessage(t('compare_nav_pending'))}
+                    onPress={() => goToDetail(topChoice)}
                     style={({ pressed }) => [styles.infoButton, pressed && styles.pressed]}
                   >
                     <MaterialCommunityIcons color={colors.primary} name="information" size={16} />
@@ -403,7 +433,7 @@ export default function CompareScreen() {
                       <Pressable
                         key={item.storeId}
                         accessibilityRole="button"
-                        onPress={() => setStatusMessage(t('score_label', { score: item.score.toFixed(2) }))}
+                        onPress={() => goToDetail(item)}
                         style={({ pressed }) => [
                           styles.recommendationRow,
                           rank > 1 && styles.recommendationRowBorder,
@@ -598,6 +628,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: spacing.md
+  },
+  bestCardInfoPressable: {
+    borderRadius: 12
   },
   bestStoreMeta: {
     flexShrink: 1,
