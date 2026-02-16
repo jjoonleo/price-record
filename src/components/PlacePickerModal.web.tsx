@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import 'leaflet/dist/leaflet.css';
 import {
   ActivityIndicator,
   Modal,
@@ -41,14 +42,20 @@ const buildFallbackMessage = (status: PlacesApiStatus, t: (k: any, p?: any) => s
 
 export const PlacePickerModal = ({ visible, initialCoordinates, onClose, onConfirm }: PlacePickerModalProps) => {
   const { t } = useI18n();
+  const notSelectedLabel = t('not_selected');
   const [apiStatus, setApiStatus] = useState<PlacesApiStatus>({ mode: 'pin-only', reason: 'missing-key' });
   const [searchQuery, setSearchQuery] = useState('');
   const [coordinates, setCoordinates] = useState<Coordinates>(initialCoordinates);
-  const [cityArea, setCityArea] = useState(t('not_selected'));
+  const [cityArea, setCityArea] = useState(notSelectedLabel);
   const [addressLine, setAddressLine] = useState<string | undefined>();
   const [suggestedStoreName, setSuggestedStoreName] = useState<string | undefined>();
   const [isResolvingAddress, setIsResolvingAddress] = useState(false);
   const [selectedSuggestionId, setSelectedSuggestionId] = useState<string | null>(null);
+  const [mapError, setMapError] = useState<string | null>(null);
+  const mapNodeRef = useRef<HTMLDivElement | null>(null);
+  const mapRef = useRef<any | null>(null);
+  const markerRef = useRef<any | null>(null);
+  const leafletRef = useRef<any | null>(null);
 
   const resolveAddress = useCallback(async (nextCoordinates: Coordinates) => {
     setIsResolvingAddress(true);
@@ -57,11 +64,11 @@ export const PlacePickerModal = ({ visible, initialCoordinates, onClose, onConfi
       setCityArea(reverse.cityArea);
       setAddressLine(reverse.addressLine);
     } catch {
-      setCityArea(t('not_selected'));
+      setCityArea(notSelectedLabel);
     } finally {
       setIsResolvingAddress(false);
     }
-  }, [t]);
+  }, [notSelectedLabel]);
 
   useEffect(() => {
     if (!visible) return;
@@ -69,8 +76,106 @@ export const PlacePickerModal = ({ visible, initialCoordinates, onClose, onConfi
     setSearchQuery('');
     setCoordinates(initialCoordinates);
     setSelectedSuggestionId(null);
+    setMapError(null);
     void resolveAddress(initialCoordinates);
   }, [initialCoordinates, resolveAddress, visible]);
+
+  useEffect(() => {
+    if (!visible || !mapNodeRef.current || typeof window === 'undefined') {
+      return;
+    }
+
+    let disposed = false;
+
+    const initMap = async () => {
+      try {
+        const module = await import('leaflet');
+        const L = module.default;
+        if (disposed || !mapNodeRef.current) {
+          return;
+        }
+
+        leafletRef.current = L;
+
+        const map = L.map(mapNodeRef.current, {
+          zoomControl: true,
+          attributionControl: true
+        }).setView([coordinates.latitude, coordinates.longitude], 15);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 19,
+          attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
+
+        const marker = L.marker([coordinates.latitude, coordinates.longitude], {
+          draggable: true,
+          icon: L.divIcon({
+            className: 'place-picker-pin',
+            iconSize: [18, 18],
+            iconAnchor: [9, 9],
+            html:
+              '<div style="width:14px;height:14px;border-radius:999px;background:#1C7C8C;border:2px solid #FFFFFF;box-shadow:0 0 0 2px rgba(28,124,140,0.25)"></div>'
+          })
+        }).addTo(map);
+
+        marker.on('dragend', () => {
+          const next = marker.getLatLng();
+          const nextCoordinates = { latitude: next.lat, longitude: next.lng };
+          setCoordinates(nextCoordinates);
+          void resolveAddress(nextCoordinates);
+        });
+
+        map.on('click', (event: any) => {
+          const nextCoordinates = { latitude: event.latlng.lat, longitude: event.latlng.lng };
+          marker.setLatLng([nextCoordinates.latitude, nextCoordinates.longitude]);
+          setCoordinates(nextCoordinates);
+          void resolveAddress(nextCoordinates);
+        });
+
+        mapRef.current = map;
+        markerRef.current = marker;
+        // Ensure correct tile layout after modal mount/layout.
+        window.requestAnimationFrame(() => {
+          map.invalidateSize();
+        });
+        window.setTimeout(() => {
+          map.invalidateSize();
+        }, 120);
+      } catch (error) {
+        setMapError(error instanceof Error ? error.message : 'Map failed to load');
+      }
+    };
+
+    void initMap();
+
+    return () => {
+      disposed = true;
+      markerRef.current = null;
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+      }
+    };
+  }, [visible]);
+
+  useEffect(() => {
+    if (!visible) {
+      return;
+    }
+
+    const map = mapRef.current;
+    const marker = markerRef.current;
+
+    if (!map || !marker) {
+      return;
+    }
+
+    marker.setLatLng([coordinates.latitude, coordinates.longitude]);
+    map.invalidateSize();
+    map.setView([coordinates.latitude, coordinates.longitude], map.getZoom() ?? 15, {
+      animate: false
+    });
+  }, [coordinates, visible]);
 
   const onSearchFailure = useCallback((reason: 'request-failed' | 'quota-exceeded' | 'request-denied') => {
     if (reason === 'request-failed') return;
@@ -159,6 +264,11 @@ export const PlacePickerModal = ({ visible, initialCoordinates, onClose, onConfi
           </View>
         ) : null}
 
+        <View style={styles.mapWrap}>
+          <div ref={mapNodeRef} style={mapStyle} />
+          {mapError ? <Text style={styles.errorText}>{mapError}</Text> : null}
+        </View>
+
         <View style={styles.selectionCard}>
           <Text style={styles.selectionTitle}>{suggestedStoreName || t('selected_place')}</Text>
           <Text style={styles.selectionText}>{cityArea}</Text>
@@ -219,6 +329,16 @@ const styles = StyleSheet.create({
     maxHeight: 220,
     backgroundColor: colors.white
   },
+  mapWrap: {
+    flex: 1,
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.sky200,
+    borderRadius: radius.md,
+    overflow: 'hidden',
+    minHeight: 260
+  },
   suggestionItem: {
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
@@ -240,3 +360,8 @@ const styles = StyleSheet.create({
   loaderRow: { flexDirection: 'row', alignItems: 'center', columnGap: spacing.sm, padding: spacing.md },
   loaderText: { color: colors.slate500, fontFamily: typography.body, fontSize: 12 }
 });
+
+const mapStyle: CSSProperties = {
+  width: '100%',
+  height: '100%'
+};

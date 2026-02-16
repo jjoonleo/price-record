@@ -63,11 +63,12 @@ export const PlacePickerModal = ({
   onConfirm
 }: PlacePickerModalProps) => {
   const { t } = useI18n();
+  const notSelectedLabel = t('not_selected');
   const insets = useSafeAreaInsets();
   const [apiStatus, setApiStatus] = useState<PlacesApiStatus>({ mode: 'pin-only', reason: 'missing-key' });
   const [searchQuery, setSearchQuery] = useState('');
   const [coordinates, setCoordinates] = useState<Coordinates>(initialCoordinates);
-  const [cityArea, setCityArea] = useState(t('not_selected'));
+  const [cityArea, setCityArea] = useState(notSelectedLabel);
   const [addressLine, setAddressLine] = useState<string | undefined>();
   const [suggestedStoreName, setSuggestedStoreName] = useState<string | undefined>();
   const [isResolvingAddress, setIsResolvingAddress] = useState(false);
@@ -83,11 +84,11 @@ export const PlacePickerModal = ({
       setCityArea(reverse.cityArea);
       setAddressLine(reverse.addressLine);
     } catch {
-      setCityArea(t('not_selected'));
+      setCityArea(notSelectedLabel);
     } finally {
       setIsResolvingAddress(false);
     }
-  }, [t]);
+  }, [notSelectedLabel]);
 
   useEffect(() => {
     if (!visible) {
