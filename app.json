@@ -1,0 +1,36 @@
+{
+  "expo": {
+    "name": "Japan Price Tracker",
+    "slug": "japan-price-tracker",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "japan-price-tracker",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "jsEngine": "hermes",
+    "experiments": {
+      "typedRoutes": true
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Allow Japan Price Tracker to use your location to compare store distances and suggest the best buying spot."
+        }
+      ],
+      "expo-localization"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.ejunpark.japanpricetracker"
+    },
+    "android": {
+      "package": "com.ejunpark.japanpricetracker",
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION"
+      ]
+    }
+  }
+}
