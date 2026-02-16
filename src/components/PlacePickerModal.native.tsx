@@ -1,10 +1,12 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Animated,
   Linking,
   Modal,
   Pressable,
+  PanResponder,
   StyleSheet,
   ScrollView,
   Text,
@@ -39,6 +41,21 @@ const regionFromCoordinates = (coords: Coordinates): Region => ({
   latitudeDelta: 0.04,
   longitudeDelta: 0.04
 });
+
+const USER_TRACKING_MODES = {
+  none: 0,
+  follow: 1,
+  followWithHeading: 2
+} as const;
+
+const MAP_LOCATION_TOLERANCE = 0.0015;
+
+const isCloseToCoordinates = (left: Coordinates, right: Coordinates): boolean => {
+  return (
+    Math.abs(left.latitude - right.latitude) <= MAP_LOCATION_TOLERANCE &&
+    Math.abs(left.longitude - right.longitude) <= MAP_LOCATION_TOLERANCE
+  );
+};
 
 const formatWebsiteLabel = (websiteUri?: string): string | null => {
   if (!websiteUri) {
@@ -94,6 +111,11 @@ export const PlacePickerModal = ({
   const [locationStatusMessage, setLocationStatusMessage] = useState<string | null>(null);
   const [mapRegion, setMapRegion] = useState<Region>(regionFromCoordinates(initialCoordinates));
   const [selectedSuggestionId, setSelectedSuggestionId] = useState<string | null>(null);
+  const [isPlaceInfoVisible, setIsPlaceInfoVisible] = useState(false);
+  const [sheetHeight, setSheetHeight] = useState(0);
+  const [userTrackingMode, setUserTrackingMode] = useState<number>(USER_TRACKING_MODES.none);
+  const sheetTranslateY = useRef(new Animated.Value(420)).current;
+  const hasOpenedRef = useRef(false);
 
   const resolveAddress = useCallback(
     async (nextCoordinates: Coordinates) => {
@@ -112,10 +134,126 @@ export const PlacePickerModal = ({
     [notSelectedLabel]
   );
 
+  const getSheetHiddenOffset = useCallback(() => {
+    return sheetHeight > 0 ? sheetHeight : 420;
+  }, [sheetHeight]);
+
+  const animateSheet = useCallback(
+    (visible: boolean, immediate = false) => {
+      const hiddenOffset = getSheetHiddenOffset();
+
+      if (immediate) {
+        sheetTranslateY.setValue(visible ? 0 : hiddenOffset);
+        setIsPlaceInfoVisible(visible);
+        return;
+      }
+
+      if (visible) {
+        setIsPlaceInfoVisible(true);
+      }
+
+      Animated.timing(sheetTranslateY, {
+        duration: 220,
+        toValue: visible ? 0 : hiddenOffset,
+        useNativeDriver: true
+      }).start(({ finished }) => {
+        if (!visible && finished) {
+          setIsPlaceInfoVisible(false);
+        }
+      });
+    },
+    [getSheetHiddenOffset, sheetTranslateY]
+  );
+
+  const showPlaceInfoSheet = useCallback(() => {
+    animateSheet(true);
+  }, [animateSheet]);
+
+  const hidePlaceInfoSheet = useCallback(
+    (immediate = false) => {
+      animateSheet(false, immediate);
+    },
+    [animateSheet]
+  );
+
+  const clearTrackingMode = useCallback(() => {
+    setUserTrackingMode(USER_TRACKING_MODES.none);
+  }, []);
+
+  const handleSheetLayout = useCallback(
+    (event: { nativeEvent: { layout: { height: number } } }) => {
+      const nextHeight = event.nativeEvent.layout.height;
+      if (nextHeight <= 0) {
+        return;
+      }
+
+      setSheetHeight(nextHeight);
+      if (!isPlaceInfoVisible) {
+        sheetTranslateY.setValue(nextHeight);
+      }
+    },
+    [isPlaceInfoVisible, sheetTranslateY]
+  );
+
+  const sheetPanResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: () => isPlaceInfoVisible,
+        onPanResponderGrant: () => {
+          sheetTranslateY.stopAnimation();
+        },
+        onPanResponderMove: (_, gestureState) => {
+          if (!isPlaceInfoVisible || gestureState.dy <= 0) {
+            return;
+          }
+
+          sheetTranslateY.setValue(Math.min(gestureState.dy, getSheetHiddenOffset()));
+        },
+        onPanResponderRelease: (_, gestureState) => {
+          const shouldHide =
+            gestureState.dy > 70 || gestureState.vy > 1 || (gestureState.dy > 35 && gestureState.vy >= 0);
+
+          if (shouldHide) {
+            hidePlaceInfoSheet();
+          } else {
+            showPlaceInfoSheet();
+          }
+        },
+        onPanResponderTerminate: () => {
+          showPlaceInfoSheet();
+        }
+      }),
+    [getSheetHiddenOffset, hidePlaceInfoSheet, isPlaceInfoVisible, showPlaceInfoSheet, sheetTranslateY]
+  );
+  const sheetHiddenOffset = sheetHeight > 0 ? sheetHeight : 420;
+  const controlsLiftDistance = useMemo(
+    () => Math.max(72, Math.min(sheetHiddenOffset, 320)),
+    [sheetHiddenOffset]
+  );
+  const controlsBottomOffset = useMemo(() => {
+    return Math.max(spacing.md, insets.bottom + spacing.md);
+  }, [insets.bottom]);
+  const controlsTranslateY = useMemo(
+    () =>
+      sheetTranslateY.interpolate({
+        inputRange: [0, sheetHiddenOffset],
+        outputRange: [-controlsLiftDistance, 0],
+        extrapolate: 'clamp'
+      }),
+    [controlsLiftDistance, sheetHiddenOffset, sheetTranslateY]
+  );
+
   useEffect(() => {
     if (!visible) {
+      hasOpenedRef.current = false;
       return;
     }
+
+    if (hasOpenedRef.current) {
+      return;
+    }
+
+    hasOpenedRef.current = true;
 
     const initStatus = getInitialPlacesApiStatus();
     setApiStatus(initStatus);
@@ -129,6 +267,8 @@ export const PlacePickerModal = ({
     setLocationStatusMessage(null);
     setIsLocatingCurrent(false);
     setSelectedSuggestionId(null);
+    hidePlaceInfoSheet(true);
+    clearTrackingMode();
     setIsInitializingLocation(true);
 
     void (async () => {
@@ -144,7 +284,7 @@ export const PlacePickerModal = ({
       }
       setIsInitializingLocation(false);
     })();
-  }, [initialCoordinates, resolveAddress, visible]);
+  }, [clearTrackingMode, hidePlaceInfoSheet, initialCoordinates, resolveAddress, visible]);
 
   const onSearchFailure = useCallback((reason: 'request-failed' | 'quota-exceeded' | 'request-denied') => {
     if (reason === 'request-failed') {
@@ -180,20 +320,14 @@ export const PlacePickerModal = ({
       setWebsiteUri(undefined);
       setSearchQuery(suggestion.primaryText);
     } finally {
+      showPlaceInfoSheet();
       setSelectedSuggestionId(null);
     }
   };
 
-  const updateFromMapCoordinate = async (nextCoordinates: Coordinates) => {
-    setCoordinates(nextCoordinates);
-    setSuggestedStoreName(undefined);
-    setWebsiteUri(undefined);
-    await resolveAddress(nextCoordinates);
-  };
-
-  const handleMapPress = (event: MapPressEvent) => {
-    const nextCoordinates = event.nativeEvent.coordinate;
-    void updateFromMapCoordinate(nextCoordinates);
+  const handleMapPress = (_event: MapPressEvent) => {
+    hidePlaceInfoSheet();
+    clearTrackingMode();
   };
 
   const handleConfirmSelection = () => {
@@ -212,11 +346,21 @@ export const PlacePickerModal = ({
     setLocationStatusMessage(null);
     const result = await captureCurrentLocation();
     if (result.status === 'granted') {
+      const isMapCenteredAtCurrentLocation = isCloseToCoordinates(
+        { latitude: mapRegion.latitude, longitude: mapRegion.longitude },
+        result.coordinates
+      );
       setCoordinates(result.coordinates);
       setCityArea(result.cityArea);
       setAddressLine(result.addressLine);
       setSuggestedStoreName(undefined);
       setWebsiteUri(undefined);
+
+      if (isMapCenteredAtCurrentLocation && userTrackingMode === USER_TRACKING_MODES.follow) {
+        setUserTrackingMode(USER_TRACKING_MODES.followWithHeading);
+      } else if (userTrackingMode !== USER_TRACKING_MODES.followWithHeading) {
+        setUserTrackingMode(USER_TRACKING_MODES.follow);
+      }
       setMapRegion(regionFromCoordinates(result.coordinates));
     } else {
       setLocationStatusMessage(result.message);
@@ -248,17 +392,16 @@ export const PlacePickerModal = ({
           ) : (
             <MapView
               onPress={handleMapPress}
+              onPanDrag={clearTrackingMode}
               region={mapRegion}
               style={styles.map}
               onRegionChangeComplete={(region: Region) => setMapRegion(region)}
+              userTrackingMode={userTrackingMode as never}
+              showsUserLocation
             >
               <Marker
                 coordinate={coordinates}
-                draggable
                 pinColor={colors.mapPin}
-                onDragEnd={(event) => {
-                  void updateFromMapCoordinate(event.nativeEvent.coordinate);
-                }}
               />
             </MapView>
           )}
@@ -281,7 +424,15 @@ export const PlacePickerModal = ({
             {locationStatusMessage ? <Text style={styles.errorText}>{locationStatusMessage}</Text> : null}
           </View>
 
-          <View style={styles.controlsWrap}>
+          <Animated.View
+            style={[
+              styles.controlsWrap,
+              {
+                bottom: controlsBottomOffset,
+                transform: [{ translateY: controlsTranslateY }]
+              }
+            ]}
+          >
             <Pressable disabled={isLocatingCurrent} onPress={handleUseCurrentLocation} style={styles.mapControlButton}>
               {isLocatingCurrent ? (
                 <ActivityIndicator color={colors.primary} size="small" />
@@ -289,10 +440,16 @@ export const PlacePickerModal = ({
                 <MaterialCommunityIcons color={colors.primary} name="crosshairs-gps" size={18} />
               )}
             </Pressable>
-            <Pressable onPress={() => setMapRegion(regionFromCoordinates(coordinates))} style={styles.mapControlButton}>
+            <Pressable
+              onPress={() => {
+                clearTrackingMode();
+                setMapRegion(regionFromCoordinates(coordinates));
+              }}
+              style={styles.mapControlButton}
+            >
               <MaterialCommunityIcons color={colors.primary} name="navigation-variant" size={18} />
             </Pressable>
-          </View>
+          </Animated.View>
 
           {apiStatus.mode === 'search-enabled' && (isSearchLoading || suggestions.length > 0) ? (
             <View style={styles.suggestionPanel}>
@@ -323,7 +480,17 @@ export const PlacePickerModal = ({
             </View>
           ) : null}
 
-          <View style={styles.sheet}>
+          <Animated.View
+            onLayout={handleSheetLayout}
+            pointerEvents={isPlaceInfoVisible ? 'auto' : 'none'}
+            style={[
+              styles.sheet,
+              {
+                transform: [{ translateY: sheetTranslateY }]
+              }
+            ]}
+            {...sheetPanResponder.panHandlers}
+          >
             <View style={styles.sheetHandleWrap}>
               <View style={styles.sheetHandle} />
             </View>
@@ -376,7 +543,7 @@ export const PlacePickerModal = ({
                   </View>
                 </View>
 
-                <Pressable onPress={onClose} style={styles.closeButton}>
+                <Pressable onPress={() => hidePlaceInfoSheet()} style={styles.closeButton}>
                   <MaterialCommunityIcons color={colors.textSecondary} name="close" size={18} />
                 </Pressable>
               </View>
@@ -385,7 +552,7 @@ export const PlacePickerModal = ({
 
               <PrimaryButton label={t('confirm_location')} onPress={handleConfirmSelection} style={styles.confirmButton} />
             </View>
-          </View>
+          </Animated.View>
         </View>
       </SafeAreaView>
     </Modal>
@@ -492,7 +659,9 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     position: 'absolute',
     right: spacing.md,
-    top: 108
+    alignItems: 'flex-end',
+    zIndex: 1200,
+    elevation: 1200
   },
   mapControlButton: {
     alignItems: 'center',

@@ -3,8 +3,10 @@ import { CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from
 import 'leaflet/dist/leaflet.css';
 import {
   ActivityIndicator,
+  Animated,
   Modal,
   Pressable,
+  PanResponder,
   ScrollView,
   StyleSheet,
   Text,
@@ -73,10 +75,14 @@ export const PlacePickerModal = ({ visible, initialCoordinates, onClose, onConfi
   const [isInitializingLocation, setIsInitializingLocation] = useState(false);
   const [isLocatingCurrent, setIsLocatingCurrent] = useState(false);
   const [locationStatusMessage, setLocationStatusMessage] = useState<string | null>(null);
+  const [isPlaceInfoVisible, setIsPlaceInfoVisible] = useState(false);
+  const [sheetHeight, setSheetHeight] = useState(0);
+  const sheetTranslateY = useRef(new Animated.Value(420)).current;
 
   const mapNodeRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<any | null>(null);
   const markerRef = useRef<any | null>(null);
+  const hasOpenedRef = useRef(false);
 
   const resolveAddress = useCallback(
     async (nextCoordinates: Coordinates) => {
@@ -95,8 +101,119 @@ export const PlacePickerModal = ({ visible, initialCoordinates, onClose, onConfi
     [notSelectedLabel]
   );
 
+  const getSheetHiddenOffset = useCallback(() => {
+    return sheetHeight > 0 ? sheetHeight : 420;
+  }, [sheetHeight]);
+
+  const animateSheet = useCallback(
+    (visible: boolean, immediate = false) => {
+      const hiddenOffset = getSheetHiddenOffset();
+
+      if (immediate) {
+        sheetTranslateY.setValue(visible ? 0 : hiddenOffset);
+        setIsPlaceInfoVisible(visible);
+        return;
+      }
+
+      if (visible) {
+        setIsPlaceInfoVisible(true);
+      }
+
+      Animated.timing(sheetTranslateY, {
+        duration: 220,
+        toValue: visible ? 0 : hiddenOffset,
+        useNativeDriver: false
+      }).start(({ finished }) => {
+        if (!visible && finished) {
+          setIsPlaceInfoVisible(false);
+        }
+      });
+    },
+    [getSheetHiddenOffset, sheetTranslateY]
+  );
+
+  const showPlaceInfoSheet = useCallback(() => {
+    animateSheet(true);
+  }, [animateSheet]);
+
+  const hidePlaceInfoSheet = useCallback(
+    (immediate = false) => {
+      animateSheet(false, immediate);
+    },
+    [animateSheet]
+  );
+
+  const handleSheetLayout = useCallback(
+    (event: { nativeEvent: { layout: { height: number } } }) => {
+      const nextHeight = event.nativeEvent.layout.height;
+      if (nextHeight <= 0) {
+        return;
+      }
+
+      setSheetHeight(nextHeight);
+      if (!isPlaceInfoVisible) {
+        sheetTranslateY.setValue(nextHeight);
+      }
+    },
+    [isPlaceInfoVisible, sheetTranslateY]
+  );
+
+  const sheetPanResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: () => isPlaceInfoVisible,
+        onPanResponderGrant: () => {
+          sheetTranslateY.stopAnimation();
+        },
+        onPanResponderMove: (_, gestureState) => {
+          if (!isPlaceInfoVisible || gestureState.dy <= 0) {
+            return;
+          }
+
+          sheetTranslateY.setValue(Math.min(gestureState.dy, getSheetHiddenOffset()));
+        },
+        onPanResponderRelease: (_, gestureState) => {
+          const shouldHide =
+            gestureState.dy > 70 || gestureState.vy > 1 || (gestureState.dy > 35 && gestureState.vy >= 0);
+
+          if (shouldHide) {
+            hidePlaceInfoSheet();
+          } else {
+            showPlaceInfoSheet();
+          }
+        },
+        onPanResponderTerminate: () => {
+          showPlaceInfoSheet();
+        }
+      }),
+    [getSheetHiddenOffset, hidePlaceInfoSheet, isPlaceInfoVisible, showPlaceInfoSheet, sheetTranslateY]
+  );
+  const sheetHiddenOffset = sheetHeight > 0 ? sheetHeight : 420;
+  const controlsLiftDistance = useMemo(
+    () => Math.max(72, Math.min(sheetHiddenOffset, 320)),
+    [sheetHiddenOffset]
+  );
+  const controlsTranslateY = useMemo(
+    () =>
+      sheetTranslateY.interpolate({
+        inputRange: [0, sheetHiddenOffset],
+        outputRange: [-controlsLiftDistance, 0],
+        extrapolate: 'clamp'
+      }),
+    [controlsLiftDistance, sheetHiddenOffset, sheetTranslateY]
+  );
+
   useEffect(() => {
-    if (!visible) return;
+    if (!visible) {
+      hasOpenedRef.current = false;
+      return;
+    }
+
+    if (hasOpenedRef.current) {
+      return;
+    }
+
+    hasOpenedRef.current = true;
 
     setApiStatus(getInitialPlacesApiStatus());
     setSearchQuery('');
@@ -109,6 +226,7 @@ export const PlacePickerModal = ({ visible, initialCoordinates, onClose, onConfi
     setIsLocatingCurrent(false);
     setSelectedSuggestionId(null);
     setMapError(null);
+    hidePlaceInfoSheet(true);
     setIsInitializingLocation(true);
 
     void (async () => {
@@ -124,7 +242,7 @@ export const PlacePickerModal = ({ visible, initialCoordinates, onClose, onConfi
       }
       setIsInitializingLocation(false);
     })();
-  }, [initialCoordinates, resolveAddress, visible]);
+  }, [hidePlaceInfoSheet, initialCoordinates, resolveAddress, visible]);
 
   useEffect(() => {
     if (!visible || !mapNodeRef.current || typeof window === 'undefined') {
@@ -152,7 +270,7 @@ export const PlacePickerModal = ({ visible, initialCoordinates, onClose, onConfi
         }).addTo(map);
 
         const marker = L.marker([coordinates.latitude, coordinates.longitude], {
-          draggable: true,
+          draggable: false,
           icon: L.divIcon({
             className: 'place-picker-pin',
             iconSize: [32, 32],
@@ -162,22 +280,8 @@ export const PlacePickerModal = ({ visible, initialCoordinates, onClose, onConfi
           })
         }).addTo(map);
 
-        marker.on('dragend', () => {
-          const next = marker.getLatLng();
-          const nextCoordinates = { latitude: next.lat, longitude: next.lng };
-          setSuggestedStoreName(undefined);
-          setWebsiteUri(undefined);
-          setCoordinates(nextCoordinates);
-          void resolveAddress(nextCoordinates);
-        });
-
-        map.on('click', (event: any) => {
-          const nextCoordinates = { latitude: event.latlng.lat, longitude: event.latlng.lng };
-          marker.setLatLng([nextCoordinates.latitude, nextCoordinates.longitude]);
-          setSuggestedStoreName(undefined);
-          setWebsiteUri(undefined);
-          setCoordinates(nextCoordinates);
-          void resolveAddress(nextCoordinates);
+        map.on('click', (_event: any) => {
+          hidePlaceInfoSheet();
         });
 
         mapRef.current = map;
@@ -245,6 +349,7 @@ export const PlacePickerModal = ({ visible, initialCoordinates, onClose, onConfi
       setWebsiteUri(undefined);
       setSearchQuery(suggestion.primaryText);
     } finally {
+      showPlaceInfoSheet();
       setSelectedSuggestionId(null);
     }
   };
@@ -315,7 +420,15 @@ export const PlacePickerModal = ({ visible, initialCoordinates, onClose, onConfi
             {locationStatusMessage ? <Text style={styles.errorText}>{locationStatusMessage}</Text> : null}
           </View>
 
-          <View style={styles.controlsWrap}>
+          <Animated.View
+            style={[
+              styles.controlsWrap,
+              {
+                bottom: spacing.md,
+                transform: [{ translateY: controlsTranslateY }]
+              }
+            ]}
+          >
             <Pressable disabled={isLocatingCurrent} onPress={handleUseCurrentLocation} style={styles.mapControlButton}>
               {isLocatingCurrent ? (
                 <ActivityIndicator color={colors.primary} size="small" />
@@ -323,7 +436,7 @@ export const PlacePickerModal = ({ visible, initialCoordinates, onClose, onConfi
                 <MaterialCommunityIcons color={colors.primary} name="crosshairs-gps" size={18} />
               )}
             </Pressable>
-          </View>
+          </Animated.View>
 
           {apiStatus.mode === 'search-enabled' && (isSearchLoading || suggestions.length > 0) ? (
             <View style={styles.suggestionPanel}>
@@ -345,7 +458,17 @@ export const PlacePickerModal = ({ visible, initialCoordinates, onClose, onConfi
 
           {mapError ? <Text style={styles.mapError}>{mapError}</Text> : null}
 
-          <View style={styles.sheet}>
+          <Animated.View
+            onLayout={handleSheetLayout}
+            pointerEvents={isPlaceInfoVisible ? 'auto' : 'none'}
+            style={[
+              styles.sheet,
+              {
+                transform: [{ translateY: sheetTranslateY }]
+              }
+            ]}
+            {...sheetPanResponder.panHandlers}
+          >
             <View style={styles.sheetHandleWrap}>
               <View style={styles.sheetHandle} />
             </View>
@@ -400,7 +523,7 @@ export const PlacePickerModal = ({ visible, initialCoordinates, onClose, onConfi
                   </View>
                 </View>
 
-                <Pressable onPress={onClose} style={styles.closeButton}>
+                <Pressable onPress={() => hidePlaceInfoSheet()} style={styles.closeButton}>
                   <MaterialCommunityIcons color={colors.textSecondary} name="close" size={18} />
                 </Pressable>
               </View>
@@ -409,7 +532,7 @@ export const PlacePickerModal = ({ visible, initialCoordinates, onClose, onConfi
 
               <PrimaryButton label={t('confirm_location')} onPress={handleConfirmSelection} style={styles.confirmButton} />
             </View>
-          </View>
+          </Animated.View>
         </View>
       </SafeAreaView>
     </Modal>
@@ -508,8 +631,8 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     position: 'absolute',
     right: spacing.md,
-    top: 108,
-    zIndex: 30
+    alignItems: 'flex-end',
+    zIndex: 1200
   },
   mapControlButton: {
     alignItems: 'center',
@@ -580,7 +703,7 @@ const styles = StyleSheet.create({
     left: 0,
     position: 'absolute',
     right: 0,
-    zIndex: 35,
+    zIndex: 1000,
     ...shadows.floating
   },
   sheetHandleWrap: {
