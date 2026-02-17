@@ -27,7 +27,14 @@ export const PlacePickerMapSurface = ({
   onRegionChangeComplete,
   onMarkerPress
 }: PlacePickerMapSurfaceProps) => {
-  const normalizedRegion = regionFromCoordinates(region);
+  const fallbackRegion = regionFromCoordinates(region);
+  const normalizedRegion: Region = {
+    latitude: fallbackRegion.latitude,
+    longitude: fallbackRegion.longitude,
+    latitudeDelta: Number.isFinite(region.latitudeDelta) && region.latitudeDelta > 0 ? region.latitudeDelta : fallbackRegion.latitudeDelta,
+    longitudeDelta:
+      Number.isFinite(region.longitudeDelta) && region.longitudeDelta > 0 ? region.longitudeDelta : fallbackRegion.longitudeDelta
+  };
   const isValidCoordinate = (value: number): boolean => Number.isFinite(value);
   const isValidRegion =
     isValidCoordinate(normalizedRegion.latitude) &&
