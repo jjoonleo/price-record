@@ -3,6 +3,7 @@
     "name": "Japan Price Tracker",
     "slug": "japan-price-tracker",
     "version": "1.0.0",
+    "icon": "./public/icons/icon-1024.png",
     "backgroundColor": "#EAF5FF",
     "primaryColor": "#12243B",
     "orientation": "portrait",
@@ -29,10 +30,16 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.ejunpark.japanpricetracker"
+      "bundleIdentifier": "com.ejunpark.japanpricetracker",
+      "icon": "./public/icons/icon-1024.png"
     },
     "android": {
       "package": "com.ejunpark.japanpricetracker",
+      "icon": "./public/icons/icon-1024.png",
+      "adaptiveIcon": {
+        "foregroundImage": "./public/icons/icon-512.png",
+        "backgroundColor": "#EAF5FF"
+      },
       "permissions": [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION"
