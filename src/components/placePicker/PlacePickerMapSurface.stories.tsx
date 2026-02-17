@@ -13,7 +13,7 @@ const nativeArgs = {
   coordinates: placePickerCoordinatesFixture,
   currentLocationCoordinates: placePickerCurrentLocationFixture,
   hasPlaceInfo: true,
-  userTrackingMode: 0,
+  followsUserLocation: false,
   onMapPress: fn(),
   onPanDrag: fn(),
   onRegionChangeComplete: fn(),

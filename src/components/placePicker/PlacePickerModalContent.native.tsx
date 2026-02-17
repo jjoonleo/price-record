@@ -36,7 +36,7 @@ type PlacePickerModalContentNativeProps = {
   onMapPanDrag: () => void;
   onRegionChangeComplete: (region: Region) => void;
   mapRegion: Region;
-  userTrackingMode: number;
+  followsUserLocation: boolean;
   clearAccessibilityLabel: string;
   isSearchEnabled: boolean;
   isSearchFocused: boolean;
@@ -95,7 +95,7 @@ export const PlacePickerModalContentNative = ({
   onMapPanDrag,
   onRegionChangeComplete,
   mapRegion,
-  userTrackingMode,
+  followsUserLocation,
   clearAccessibilityLabel,
   isSearchEnabled,
   isSearchFocused,
@@ -154,7 +154,7 @@ export const PlacePickerModalContentNative = ({
           onPanDrag={onMapPanDrag}
           onRegionChangeComplete={onRegionChangeComplete}
           region={mapRegion}
-          userTrackingMode={userTrackingMode}
+          followsUserLocation={followsUserLocation}
         />
       )}
 

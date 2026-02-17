@@ -2,11 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Keyboard } from 'react-native';
 import { Region } from 'react-native-maps';
 import { Coordinates } from '../../../types/domain';
-import {
-  isCloseToCoordinates,
-  regionFromCoordinates,
-  USER_TRACKING_MODES
-} from '../placePickerMapUtils';
+import { regionFromCoordinates } from '../placePickerMapUtils';
 
 type UseCurrentLocationResult = {
   currentLocationCoordinates: Coordinates | null;
@@ -37,7 +33,7 @@ export const usePlacePickerNativeMapUiState = ({
   handleUseCurrentLocation
 }: UsePlacePickerNativeMapUiStateParams) => {
   const [mapRegion, setMapRegion] = useState<Region>(regionFromCoordinates(initialCoordinates));
-  const [userTrackingMode, setUserTrackingMode] = useState<number>(USER_TRACKING_MODES.none);
+  const [followsUserLocation, setFollowsUserLocation] = useState(false);
 
   useEffect(() => {
     if (!visible) {
@@ -48,7 +44,7 @@ export const usePlacePickerNativeMapUiState = ({
   }, [coordinates, visible]);
 
   const clearTrackingMode = useCallback(() => {
-    setUserTrackingMode(USER_TRACKING_MODES.none);
+    setFollowsUserLocation(false);
   }, []);
 
   const resetMapUiForSession = useCallback(
@@ -80,7 +76,6 @@ export const usePlacePickerNativeMapUiState = ({
   }, [hasPlaceInfo, hideSearchUi, showPlaceInfoSheet]);
 
   const handleUseCurrentLocationPress = useCallback(async () => {
-    const regionBeforeRequest = mapRegion;
     const { currentLocationCoordinates: nextCoordinates, locationStatusMessage: nextLocationError } =
       await handleUseCurrentLocation();
 
@@ -88,19 +83,9 @@ export const usePlacePickerNativeMapUiState = ({
       return;
     }
 
-    const isMapCenteredAtCurrentLocation = isCloseToCoordinates(
-      { latitude: regionBeforeRequest.latitude, longitude: regionBeforeRequest.longitude },
-      nextCoordinates
-    );
-
-    if (isMapCenteredAtCurrentLocation && userTrackingMode === USER_TRACKING_MODES.follow) {
-      setUserTrackingMode(USER_TRACKING_MODES.followWithHeading);
-    } else if (userTrackingMode !== USER_TRACKING_MODES.followWithHeading) {
-      setUserTrackingMode(USER_TRACKING_MODES.follow);
-    }
-
+    setFollowsUserLocation(true);
     setMapRegion(regionFromCoordinates(nextCoordinates));
-  }, [handleUseCurrentLocation, mapRegion, userTrackingMode]);
+  }, [handleUseCurrentLocation]);
 
   const handleRecenter = useCallback(() => {
     clearTrackingMode();
@@ -116,6 +101,6 @@ export const usePlacePickerNativeMapUiState = ({
     mapRegion,
     resetMapUiForSession,
     setMapRegion,
-    userTrackingMode
+    followsUserLocation
   };
 };

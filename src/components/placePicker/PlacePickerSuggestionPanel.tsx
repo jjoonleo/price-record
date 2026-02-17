@@ -37,7 +37,7 @@ export const PlacePickerSuggestionPanel = ({
           <Text style={styles.loaderText}>{loadingLabel}</Text>
         </View>
       ) : (
-        <ScrollView keyboardShouldPersistTaps="handled">
+        <ScrollView keyboardShouldPersistTaps="always">
           {suggestions.map((suggestion) => (
             <Pressable
               key={suggestion.placeId}

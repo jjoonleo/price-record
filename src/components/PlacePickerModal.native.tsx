@@ -115,7 +115,7 @@ const PlacePickerModalBody = ({
     mapRegion,
     resetMapUiForSession,
     setMapRegion,
-    userTrackingMode
+    followsUserLocation
   } = usePlacePickerNativeMapUiState({
     coordinates,
     handleUseCurrentLocation,
@@ -180,6 +180,7 @@ const PlacePickerModalBody = ({
       locationStatusMessage={locationStatusMessage}
       mapCenteringLabel={t('map_centering')}
       mapRegion={mapRegion}
+      followsUserLocation={followsUserLocation}
       noAddressLabel={t('no_address')}
       onBackPress={onClose}
       onConfirm={handleConfirmSelection}
@@ -223,7 +224,6 @@ const PlacePickerModalBody = ({
       sheetTranslateY={sheetTranslateY}
       suggestionApplyingLabel={t('applying')}
       suggestions={suggestions}
-      userTrackingMode={userTrackingMode}
       visible={visible}
       websiteLabel={formatWebsiteLabel(websiteUri)}
       websiteUri={websiteUri}

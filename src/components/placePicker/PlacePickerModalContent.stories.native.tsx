@@ -30,7 +30,7 @@ const meta = {
     onMapPanDrag: fn(),
     onRegionChangeComplete: fn(),
     mapRegion: placePickerRegionFixture,
-    userTrackingMode: 0,
+    followsUserLocation: false,
     clearAccessibilityLabel: 'Clear search',
     isSearchEnabled: true,
     isSearchFocused: false,

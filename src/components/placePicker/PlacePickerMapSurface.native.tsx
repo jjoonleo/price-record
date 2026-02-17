@@ -1,4 +1,4 @@
-import { StyleSheet, View } from 'react-native';
+import { Platform, StyleSheet, View } from 'react-native';
 import MapView, { MapPressEvent, Marker, Region } from 'react-native-maps';
 import { colors } from '../../theme/tokens';
 import { Coordinates } from '../../types/domain';
@@ -8,7 +8,7 @@ type PlacePickerMapSurfaceProps = {
   coordinates: Coordinates;
   currentLocationCoordinates: Coordinates | null;
   hasPlaceInfo: boolean;
-  userTrackingMode: number;
+  followsUserLocation: boolean;
   onMapPress: (event: MapPressEvent) => void;
   onPanDrag: () => void;
   onRegionChangeComplete: (region: Region) => void;
@@ -20,7 +20,7 @@ export const PlacePickerMapSurface = ({
   coordinates,
   currentLocationCoordinates,
   hasPlaceInfo,
-  userTrackingMode,
+  followsUserLocation,
   onMapPress,
   onPanDrag,
   onRegionChangeComplete,
@@ -34,7 +34,7 @@ export const PlacePickerMapSurface = ({
       region={region}
       showsUserLocation
       style={styles.map}
-      userTrackingMode={userTrackingMode as never}
+      {...(Platform.OS === 'ios' ? { followsUserLocation } : {})}
     >
       {currentLocationCoordinates ? (
         <Marker coordinate={currentLocationCoordinates} anchor={{ x: 0.5, y: 0.5 }}>
