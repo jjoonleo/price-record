@@ -51,9 +51,11 @@ export const PlacePickerMapSurface = ({
     return <View style={styles.map} />;
   }
 
+  const providerProps = Platform.OS === 'android' ? { provider: PROVIDER_GOOGLE as const } : {};
+
   return (
     <MapView
-      provider={PROVIDER_GOOGLE}
+      {...providerProps}
       onPress={onMapPress}
       onPanDrag={onPanDrag}
       onRegionChangeComplete={onRegionChangeComplete}

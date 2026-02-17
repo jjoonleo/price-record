@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Keyboard, Platform } from 'react-native';
-import { Details, Region } from 'react-native-maps';
+import { Details, MapPressEvent, Region } from 'react-native-maps';
 import { Coordinates } from '../../../types/domain';
 import { regionFromCoordinates } from '../placePickerMapUtils';
 
@@ -55,7 +55,7 @@ export const usePlacePickerNativeMapUiState = ({
     [clearTrackingMode]
   );
 
-  const handleMapPress = useCallback(() => {
+  const handleMapPress = useCallback((_event: MapPressEvent) => {
     if (isPlaceInfoVisible) {
       hidePlaceInfoSheet();
     }
