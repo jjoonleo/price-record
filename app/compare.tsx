@@ -1,33 +1,19 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import {
-  ActivityIndicator,
-  Image,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-  useWindowDimensions
-} from 'react-native';
+import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getLatestStorePricesByProduct } from '../src/db/repositories/priceEntriesRepo';
-import { listProductOptions } from '../src/db/repositories/productsRepo';
+import { getProductById } from '../src/db/repositories/productsRepo';
 import { useI18n } from '../src/i18n/useI18n';
 import { captureCurrentLocation } from '../src/services/locationService';
 import { buildStoreComparisons } from '../src/services/rankingService';
 import { useFiltersStore } from '../src/state/useFiltersStore';
 import { colors, spacing, typography } from '../src/theme/tokens';
-import { Coordinates, ProductOption, StoreComparison } from '../src/types/domain';
-import {
-  buildPriceComparisonRows,
-  buildRecommendationRows,
-  computeVsAvgPercent,
-  formatRelativeAge
-} from '../src/utils/compareScreen';
+import { Coordinates, Product, StoreComparison } from '../src/types/domain';
+import { buildPriceComparisonRows, buildRecommendationRows, computeVsAvgPercent, formatRelativeAge } from '../src/utils/compareScreen';
 import { openExternalRoute } from '../src/utils/externalMapNavigation';
 import { formatYen } from '../src/utils/formatters';
 import { buildProductPriceDetailRouteParams } from '../src/utils/productPriceDetail';
@@ -37,7 +23,7 @@ const productPlaceholderImage = require('../src/assets/compare-placeholder.png')
 const DEVICE_FRAME_WIDTH = 390;
 
 const toPriceLabel = (value: number, locale: string): string => {
-  return formatYen(value, locale).replace('JP\u00A5', '\u00A5').replace(/\u00A0/g, '');
+  return formatYen(value, locale).replace('JP¥', '¥').replace(/\u00A0/g, '');
 };
 
 const toSignedPercent = (value: number): string => {
@@ -53,54 +39,47 @@ export default function CompareScreen() {
   const { language, t } = useI18n();
   const locale = language === 'ko' ? 'ko-KR' : 'en-US';
   const { width } = useWindowDimensions();
-  const frameWidth = Math.min(width, DEVICE_FRAME_WIDTH);
-  const contentWidth = Math.max(0, frameWidth - spacing.md * 2);
+  const frameWidth = Math.min(Math.max(width - spacing.md * 2, 0), DEVICE_FRAME_WIDTH);
+  const contentWidth = Math.max(0, frameWidth);
 
-  const { selectedProductId, setSelectedProductId, clearHistoryStoreFilter } = useFiltersStore();
+  const { selectedProductId, clearHistoryStoreFilter } = useFiltersStore();
 
-  const [products, setProducts] = useState<ProductOption[]>([]);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [comparisons, setComparisons] = useState<StoreComparison[]>([]);
   const [userLocation, setUserLocation] = useState<Coordinates | undefined>();
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
-  const refreshForProduct = useCallback(async (productId: string | null, location?: Coordinates) => {
-    if (!productId) {
-      setComparisons([]);
-      return;
-    }
-
-    const latestRows = await getLatestStorePricesByProduct(productId);
-    setComparisons(buildStoreComparisons(latestRows, location));
-  }, []);
-
   const hydrateScreen = useCallback(async () => {
     setIsLoading(true);
     setErrorMessage(null);
+    setStatusMessage(null);
 
     try {
-      const [productOptions, locationResult] = await Promise.all([listProductOptions(), captureCurrentLocation()]);
-      setProducts(productOptions);
-
-      const nextProductId =
-        productOptions.find((item) => item.id === selectedProductId)?.id ?? productOptions[0]?.id ?? null;
-
-      if (nextProductId !== selectedProductId) {
-        setSelectedProductId(nextProductId);
-        clearHistoryStoreFilter();
-      }
-
+      const locationResult = await captureCurrentLocation();
       const nextLocation = locationResult.status === 'granted' ? locationResult.coordinates : undefined;
       setUserLocation(nextLocation);
 
-      await refreshForProduct(nextProductId, nextLocation);
+      if (!selectedProductId) {
+        setSelectedProduct(null);
+        setComparisons([]);
+        return;
+      }
+
+      const [product, latestRows] = await Promise.all([
+        getProductById(selectedProductId),
+        getLatestStorePricesByProduct(selectedProductId)
+      ]);
+
+      setSelectedProduct(product);
+      setComparisons(buildStoreComparisons(latestRows, nextLocation));
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : t('compare_load_error'));
     } finally {
       setIsLoading(false);
     }
-  }, [clearHistoryStoreFilter, refreshForProduct, selectedProductId, setSelectedProductId, t]);
+  }, [selectedProductId, t]);
 
   useFocusEffect(
     useCallback(() => {
@@ -108,28 +87,24 @@ export default function CompareScreen() {
     }, [hydrateScreen])
   );
 
-  const selectedProduct = useMemo(
-    () => products.find((product) => product.id === selectedProductId) ?? null,
-    [products, selectedProductId]
-  );
-
-  const selectedProductSubtitle = useMemo(() => {
-    const productWithMetadata = selectedProduct as (ProductOption & { subtitle?: string; packageInfo?: string }) | null;
-    const subtitle = productWithMetadata?.subtitle ?? productWithMetadata?.packageInfo ?? null;
-    return subtitle && subtitle.trim().length > 0 ? subtitle : null;
-  }, [selectedProduct]);
-
-  const topChoice = comparisons[0] ?? null;
   const hasLocation = Boolean(userLocation);
-
-  const priceComparisonRows = useMemo(() => buildPriceComparisonRows(comparisons, 4), [comparisons]);
-  const recommendationRows = useMemo(() => buildRecommendationRows(comparisons, 3), [comparisons]);
+  const topChoice = comparisons[0] ?? null;
   const vsAvgPercent = useMemo(() => computeVsAvgPercent(comparisons), [comparisons]);
+  const priceComparisonRows = useMemo(() => buildPriceComparisonRows(comparisons), [comparisons]);
+  const recommendationRows = useMemo(() => buildRecommendationRows(comparisons), [comparisons]);
+
+  const lastVerified = useMemo(() => {
+    if (!topChoice) {
+      return null;
+    }
+
+    return t('compare_last_verified', { time: formatRelativeAge(topChoice.observedAt) });
+  }, [topChoice, t]);
 
   const goToDetail = useCallback(
     (item: StoreComparison) => {
       if (!selectedProduct) {
-        setStatusMessage(t('no_item_selected'));
+        setStatusMessage(t('detail_missing_params_title'));
         return;
       }
 
@@ -165,207 +140,211 @@ export default function CompareScreen() {
     router.navigate('/history');
   }, [clearHistoryStoreFilter, router]);
 
-  const lastVerified = useMemo(() => {
-    if (!topChoice) {
-      return null;
-    }
-
-    return t('compare_last_verified', { time: formatRelativeAge(topChoice.observedAt) });
-  }, [topChoice, t]);
-
   return (
     <SafeAreaView edges={['top']} style={styles.screen}>
-      <View style={styles.centerWrap}>
-        <View style={[styles.frame, { width: frameWidth }]}> 
-          <View style={styles.header}>
-            <View style={styles.headerRow}>
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => router.navigate('/capture')}
-                style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
-              >
-                <MaterialCommunityIcons color={colors.primary} name="chevron-left" size={19} />
-                <Text style={styles.backText}>{t('back')}</Text>
-              </Pressable>
+      <View style={styles.header}>
+        <View style={[styles.headerRow, { width: frameWidth }]}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.navigate('/')}
+            style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
+          >
+            <MaterialCommunityIcons color={colors.primary} name="chevron-left" size={19} />
+            <Text style={styles.backText}>{t('back')}</Text>
+          </Pressable>
 
-              <Text style={styles.headerTitle}>{t('compare_header_title')}</Text>
+          <Text style={styles.headerTitle}>{t('compare_header_title')}</Text>
 
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => router.navigate('/capture')}
-                style={({ pressed }) => [styles.headerAction, pressed && styles.pressed]}
-              >
-                <MaterialCommunityIcons color={colors.textSecondary} name="share-variant-outline" size={16} />
-              </Pressable>
-            </View>
-          </View>
-
-          <ScrollView contentContainerStyle={styles.scrollContent}>
-            <View style={[styles.heroSection, { width: contentWidth }]}> 
-              <View style={styles.productImageCard}>
-                <Image source={productPlaceholderImage} style={styles.productImage} />
-              </View>
-              <Text numberOfLines={2} style={styles.productName}>
-                {selectedProduct?.name ?? t('no_item_selected')}
-              </Text>
-              {selectedProductSubtitle ? <Text style={styles.productSubtitle}>{selectedProductSubtitle}</Text> : null}
-            </View>
-
-            {isLoading ? (
-              <View style={[styles.loadingWrap, { width: contentWidth }]}> 
-                <ActivityIndicator color={colors.primary} size="small" />
-                <Text style={styles.loadingText}>{t('compare_loading')}</Text>
-              </View>
-            ) : null}
-
-            {errorMessage ? (
-              <View style={[styles.errorWrap, { width: contentWidth }]}> 
-                <Text style={styles.errorText}>{errorMessage}</Text>
-              </View>
-            ) : null}
-
-            {!isLoading && topChoice ? (
-              <>
-                <LinearGradient colors={['#137FEC', '#2563EB']} end={{ x: 1, y: 1 }} start={{ x: 0, y: 0 }} style={[styles.bestCard, { width: contentWidth }]}> 
-                  <View pointerEvents="none" style={styles.bestCardOrbTop} />
-                  <View pointerEvents="none" style={styles.bestCardOrbBottom} />
-
-                  <View style={styles.bestCardTopRow}>
-                    <View>
-                      <View style={styles.bestLabelRow}>
-                        <MaterialCommunityIcons color="#DBEAFE" name="star-circle-outline" size={12} />
-                        <Text style={styles.bestLabelText}>{t('compare_best_value')}</Text>
-                      </View>
-                      <Text style={styles.bestPrice}>{toPriceLabel(topChoice.latestPriceYen, locale)}</Text>
-                      <Text numberOfLines={1} style={styles.bestStoreText}>
-                        {topChoice.storeName} ({topChoice.cityArea})
-                      </Text>
-                    </View>
-
-                    <View style={styles.vsAvgChip}>
-                      <Text style={styles.vsAvgPercent}>{toSignedPercent(vsAvgPercent)}</Text>
-                      <Text style={styles.vsAvgText}>{t('compare_vs_avg')}</Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.bestCardFooterRow}>
-                    <View style={styles.verifiedRow}>
-                      <MaterialCommunityIcons color="#DBEAFE" name="clock-outline" size={13} />
-                      <Text style={styles.verifiedText}>{lastVerified}</Text>
-                    </View>
-
-                    <Pressable
-                      accessibilityRole="button"
-                      onPress={() => {
-                        void handleNavigateFromCompare(topChoice);
-                      }}
-                      style={({ pressed }) => [styles.navigateButton, pressed && styles.pressed]}
-                    >
-                      <MaterialCommunityIcons color="#137FEC" name="navigation-variant-outline" size={13} />
-                      <Text style={styles.navigateButtonText}>{t('compare_navigate')}</Text>
-                    </Pressable>
-                  </View>
-                </LinearGradient>
-
-                <View style={[styles.sectionBlock, { width: contentWidth }]}> 
-                  <Text style={styles.sectionLabel}>{t('compare_price_comparison')}</Text>
-                  <View style={styles.surfaceCard}>
-                    {priceComparisonRows.map((row) => (
-                      <View key={row.item.storeId} style={styles.priceRow}>
-                        <View style={styles.priceRowTop}>
-                          <Text numberOfLines={1} style={[styles.priceStoreName, row.isBest && styles.priceStoreNameActive]}>
-                            {row.item.storeName}
-                          </Text>
-                          <Text style={[styles.priceStoreValue, row.isBest && styles.priceStoreValueActive]}>
-                            {toPriceLabel(row.item.latestPriceYen, locale)}
-                          </Text>
-                        </View>
-                        <View style={styles.priceTrack}>
-                          <View
-                            style={[
-                              styles.priceFill,
-                              {
-                                width: `${row.widthPercent}%`,
-                                backgroundColor: row.color
-                              }
-                            ]}
-                          />
-                        </View>
-                      </View>
-                    ))}
-
-                    <Pressable
-                      accessibilityRole="button"
-                      onPress={handleViewFullHistory}
-                      style={({ pressed }) => [styles.viewHistoryButton, pressed && styles.pressed]}
-                    >
-                      <Text style={styles.viewHistoryText}>{t('compare_view_full_history')}</Text>
-                    </Pressable>
-                  </View>
-                </View>
-
-                {recommendationRows.length > 0 ? (
-                  <View style={[styles.sectionBlock, { width: contentWidth }]}> 
-                    <Text style={styles.sectionLabel}>{t('compare_top_recommendations')}</Text>
-                    <View style={styles.surfaceCard}> 
-                      {recommendationRows.map((row, index) => (
-                        <Pressable
-                          key={row.item.storeId}
-                          accessibilityRole="button"
-                          onPress={() => goToDetail(row.item)}
-                          style={({ pressed }) => [
-                            styles.recommendationRow,
-                            index > 0 && styles.recommendationRowBorder,
-                            pressed && styles.pressed
-                          ]}
-                        >
-                          <View style={[styles.rankBubble, row.rank === 2 ? styles.rankBubbleActive : styles.rankBubbleIdle]}>
-                            <Text style={[styles.rankBubbleText, row.rank === 2 ? styles.rankBubbleTextActive : styles.rankBubbleTextIdle]}>
-                              {row.rank}
-                            </Text>
-                          </View>
-
-                          <View style={styles.recommendationBody}>
-                            <Text numberOfLines={1} style={styles.recommendationStoreName}>
-                              {row.item.storeName}
-                            </Text>
-                            <View style={styles.recommendationMetaRow}>
-                              <MaterialCommunityIcons color="#94A3B8" name="map-marker-outline" size={12} />
-                              <Text numberOfLines={1} style={styles.recommendationMeta}>
-                                {hasLocation
-                                  ? `${row.item.distanceKm.toFixed(1)}km • ${row.item.cityArea}`
-                                  : `${t('compare_distance_unavailable')} • ${row.item.cityArea}`}
-                              </Text>
-                            </View>
-                          </View>
-
-                          <View style={styles.recommendationPriceWrap}>
-                            <Text style={styles.recommendationPrice}>{toPriceLabel(row.item.latestPriceYen, locale)}</Text>
-                            <Text style={row.savingsYen > 0 ? styles.recommendationSave : styles.recommendationRegular}>
-                              {row.savingsYen > 0
-                                ? `${t('compare_save_prefix')} ${toPriceLabel(row.savingsYen, locale)}`
-                                : t('compare_regular')}
-                            </Text>
-                          </View>
-                        </Pressable>
-                      ))}
-                    </View>
-                  </View>
-                ) : null}
-              </>
-            ) : null}
-
-            {!isLoading && !topChoice ? (
-              <View style={[styles.emptyCard, { width: contentWidth }]}> 
-                <Text style={styles.emptyTitle}>{t('compare_empty_title')}</Text>
-                <Text style={styles.emptyBody}>{t('compare_empty_body')}</Text>
-              </View>
-            ) : null}
-
-            {statusMessage ? <Text style={[styles.statusMessage, { width: contentWidth }]}>{statusMessage}</Text> : null}
-          </ScrollView>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.navigate('/capture')}
+            style={({ pressed }) => [styles.headerAction, pressed && styles.pressed]}
+          >
+            <MaterialCommunityIcons color={colors.primary} name="qrcode-scan" size={18} />
+          </Pressable>
         </View>
       </View>
+
+      <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+        <View style={[styles.heroSection, { width: contentWidth }]}>
+          <View style={styles.productImageCard}>
+            <Image source={productPlaceholderImage} style={styles.productImage} />
+          </View>
+          <Text numberOfLines={2} style={styles.productName}>
+            {selectedProduct?.name ?? t('no_item_selected')}
+          </Text>
+        </View>
+
+        {!selectedProductId ? (
+          <View style={[styles.emptyCard, { width: contentWidth }]}>
+            <Text style={styles.emptyTitle}>{t('no_item_selected')}</Text>
+            <Text style={styles.emptyBody}>{t('no_item_selected_body')}</Text>
+          </View>
+        ) : null}
+
+        {isLoading ? (
+          <View style={[styles.loadingWrap, { width: contentWidth }]}>
+            <ActivityIndicator color={colors.primary} size="small" />
+            <Text style={styles.loadingText}>{t('compare_loading')}</Text>
+          </View>
+        ) : null}
+
+        {errorMessage ? (
+          <View style={[styles.errorWrap, { width: contentWidth }]}>
+            <Text style={styles.errorText}>{errorMessage}</Text>
+          </View>
+        ) : null}
+
+        {!isLoading && !errorMessage && selectedProductId && topChoice ? (
+          <>
+            <LinearGradient
+              colors={['#137FEC', '#2563EB']}
+              end={{ x: 1, y: 1 }}
+              start={{ x: 0, y: 0 }}
+              style={[styles.bestCard, { width: contentWidth }]}
+            >
+              <View pointerEvents="none" style={styles.bestCardOrbTop} />
+              <View pointerEvents="none" style={styles.bestCardOrbBottom} />
+
+              <View style={styles.bestCardTopRow}>
+                <View>
+                  <View style={styles.bestLabelRow}>
+                    <MaterialCommunityIcons color="#DBEAFE" name="star-circle-outline" size={12} />
+                    <Text style={styles.bestLabelText}>{t('compare_best_value')}</Text>
+                  </View>
+                  <Text style={styles.bestPrice}>{toPriceLabel(topChoice.latestPriceYen, locale)}</Text>
+                  <Text numberOfLines={1} style={styles.bestStoreText}>
+                    {topChoice.storeName} ({topChoice.cityArea})
+                  </Text>
+                </View>
+
+                <View style={styles.vsAvgChip}>
+                  <Text style={styles.vsAvgPercent}>{toSignedPercent(vsAvgPercent)}</Text>
+                  <Text style={styles.vsAvgText}>{t('compare_vs_avg')}</Text>
+                </View>
+              </View>
+
+              <View style={styles.bestCardFooterRow}>
+                <View style={styles.verifiedRow}>
+                  <MaterialCommunityIcons color="#DBEAFE" name="clock-outline" size={13} />
+                  <Text style={styles.verifiedText}>{lastVerified}</Text>
+                </View>
+
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => {
+                    void handleNavigateFromCompare(topChoice);
+                  }}
+                  style={({ pressed }) => [styles.navigateButton, pressed && styles.pressed]}
+                >
+                  <MaterialCommunityIcons color="#137FEC" name="navigation-variant-outline" size={13} />
+                  <Text style={styles.navigateButtonText}>{t('compare_navigate')}</Text>
+                </Pressable>
+              </View>
+            </LinearGradient>
+
+            <View style={[styles.sectionBlock, { width: contentWidth }]}>
+              <Text style={styles.sectionLabel}>{t('compare_price_comparison')}</Text>
+              <View style={styles.surfaceCard}>
+                {priceComparisonRows.map((row) => (
+                  <View key={row.item.storeId} style={styles.priceRow}>
+                    <View style={styles.priceRowTop}>
+                      <Text numberOfLines={1} style={[styles.priceStoreName, row.isBest && styles.priceStoreNameActive]}>
+                        {row.item.storeName}
+                      </Text>
+                      <Text style={[styles.priceStoreValue, row.isBest && styles.priceStoreValueActive]}>
+                        {toPriceLabel(row.item.latestPriceYen, locale)}
+                      </Text>
+                    </View>
+                    <View style={styles.priceTrack}>
+                      <View
+                        style={[
+                          styles.priceFill,
+                          {
+                            width: `${row.widthPercent}%`,
+                            backgroundColor: row.color
+                          }
+                        ]}
+                      />
+                    </View>
+                  </View>
+                ))}
+
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={handleViewFullHistory}
+                  style={({ pressed }) => [styles.viewHistoryButton, pressed && styles.pressed]}
+                >
+                  <Text style={styles.viewHistoryText}>{t('compare_view_full_history')}</Text>
+                </Pressable>
+              </View>
+            </View>
+
+            {recommendationRows.length > 0 ? (
+              <View style={[styles.sectionBlock, { width: contentWidth }]}>
+                <Text style={styles.sectionLabel}>{t('compare_top_recommendations')}</Text>
+                <View style={styles.surfaceCard}>
+                  {recommendationRows.map((row, index) => (
+                    <Pressable
+                      key={row.item.storeId}
+                      accessibilityRole="button"
+                      onPress={() => goToDetail(row.item)}
+                      style={({ pressed }) => [
+                        styles.recommendationRow,
+                        index > 0 && styles.recommendationRowBorder,
+                        pressed && styles.pressed
+                      ]}
+                    >
+                      <View style={[styles.rankBubble, row.rank === 2 ? styles.rankBubbleActive : styles.rankBubbleIdle]}>
+                        <Text
+                          style={[
+                            styles.rankBubbleText,
+                            row.rank === 2 ? styles.rankBubbleTextActive : styles.rankBubbleTextIdle
+                          ]}
+                        >
+                          {row.rank}
+                        </Text>
+                      </View>
+
+                      <View style={styles.recommendationBody}>
+                        <Text numberOfLines={1} style={styles.recommendationStoreName}>
+                          {row.item.storeName}
+                        </Text>
+                        <View style={styles.recommendationMetaRow}>
+                          <MaterialCommunityIcons color="#94A3B8" name="map-marker-outline" size={12} />
+                          <Text numberOfLines={1} style={styles.recommendationMeta}>
+                            {hasLocation
+                              ? `${row.item.distanceKm.toFixed(1)}km • ${row.item.cityArea}`
+                              : `${t('compare_distance_unavailable')} • ${row.item.cityArea}`}
+                          </Text>
+                        </View>
+                      </View>
+
+                      <View style={styles.recommendationPriceWrap}>
+                        <Text style={styles.recommendationPrice}>{toPriceLabel(row.item.latestPriceYen, locale)}</Text>
+                        <Text style={row.savingsYen > 0 ? styles.recommendationSave : styles.recommendationRegular}>
+                          {row.savingsYen > 0
+                            ? `${t('compare_save_prefix')} ${toPriceLabel(row.savingsYen, locale)}`
+                            : t('compare_regular')}
+                        </Text>
+                      </View>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+            ) : null}
+          </>
+        ) : null}
+
+        {!isLoading && !errorMessage && selectedProductId && !topChoice ? (
+          <View style={[styles.emptyCard, { width: contentWidth }]}>
+            <Text style={styles.emptyTitle}>{t('compare_empty_title')}</Text>
+            <Text style={styles.emptyBody}>{t('compare_empty_body')}</Text>
+          </View>
+        ) : null}
+
+        {statusMessage ? <Text style={[styles.statusMessage, { width: contentWidth }]}>{statusMessage}</Text> : null}
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -375,28 +354,19 @@ const styles = StyleSheet.create({
     backgroundColor: '#F6F7F8',
     flex: 1
   },
-  centerWrap: {
-    alignItems: 'center',
-    flex: 1
-  },
-  frame: {
-    backgroundColor: '#F6F7F8',
-    flex: 1
-  },
   header: {
+    alignItems: 'center',
     backgroundColor: 'rgba(246,247,248,0.9)',
     borderBottomColor: 'rgba(0,0,0,0.05)',
     borderBottomWidth: 1,
-    paddingBottom: 13,
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.sm
+    paddingBottom: spacing.xs,
+    paddingTop: spacing.xs
   },
   headerRow: {
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    minHeight: 32,
-    position: 'relative'
+    minHeight: 32
   },
   backButton: {
     alignItems: 'center',
@@ -414,10 +384,7 @@ const styles = StyleSheet.create({
     fontFamily: typography.body,
     fontSize: typography.sizes.title,
     fontWeight: '700',
-    left: 0,
     lineHeight: 26,
-    position: 'absolute',
-    right: 0,
     textAlign: 'center'
   },
   headerAction: {
@@ -426,16 +393,17 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     height: 32,
     justifyContent: 'center',
-    width: 32
+    width: 35
   },
   scrollContent: {
     alignItems: 'center',
-    paddingBottom: 96
+    paddingBottom: 96,
+    paddingTop: spacing.md
   },
   heroSection: {
     alignItems: 'center',
     paddingBottom: 20,
-    paddingTop: 24
+    paddingTop: 10
   },
   productImageCard: {
     alignItems: 'center',
@@ -466,18 +434,12 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     textAlign: 'center'
   },
-  productSubtitle: {
-    color: '#64748B',
-    fontFamily: typography.body,
-    fontSize: typography.sizes.body,
-    lineHeight: 22.5,
-    textAlign: 'center'
-  },
   loadingWrap: {
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: 80,
-    paddingBottom: spacing.md
+    paddingBottom: spacing.md,
+    width: '100%'
   },
   loadingText: {
     color: '#64748B',
@@ -486,7 +448,8 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs
   },
   errorWrap: {
-    paddingBottom: spacing.md
+    paddingBottom: spacing.md,
+    width: '100%'
   },
   errorText: {
     color: colors.danger,
