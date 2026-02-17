@@ -1,5 +1,6 @@
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { colors, spacing, typography } from '../../theme/tokens';
+import { spacing, typography } from '../../theme/tokens';
 
 type ProductPriceActionButtonsProps = {
   width: number;
@@ -18,12 +19,14 @@ export const ProductPriceActionButtons = ({
 }: ProductPriceActionButtonsProps) => {
   return (
     <View style={[styles.actionGroup, { width }]}>
-      <Pressable accessibilityRole="button" onPress={onEdit} style={({ pressed }) => [styles.actionButton, pressed && styles.pressed]}>
-        <Text style={styles.actionButtonPrimaryText}>{editLabel}</Text>
+      <Pressable accessibilityRole="button" onPress={onDelete} style={({ pressed }) => [styles.actionButton, pressed && styles.pressed]}>
+        <MaterialCommunityIcons color="#334155" name="trash-can-outline" size={15} />
+        <Text style={styles.actionButtonText}>{deleteLabel}</Text>
       </Pressable>
 
-      <Pressable accessibilityRole="button" onPress={onDelete} style={({ pressed }) => [styles.actionButton, pressed && styles.pressed]}>
-        <Text style={styles.actionButtonDangerText}>{deleteLabel}</Text>
+      <Pressable accessibilityRole="button" onPress={onEdit} style={({ pressed }) => [styles.actionButton, pressed && styles.pressed]}>
+        <MaterialCommunityIcons color="#334155" name="pencil-outline" size={16} />
+        <Text style={styles.actionButtonText}>{editLabel}</Text>
       </Pressable>
     </View>
   );
@@ -31,32 +34,32 @@ export const ProductPriceActionButtons = ({
 
 const styles = StyleSheet.create({
   actionGroup: {
+    flexDirection: 'row',
     gap: spacing.sm,
-    marginTop: spacing.xl
+    marginTop: spacing.md
   },
   actionButton: {
     alignItems: 'center',
-    backgroundColor: colors.white,
-    borderColor: colors.borderSubtle,
-    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
+    borderColor: 'rgba(0,0,0,0.05)',
+    borderRadius: 24,
     borderWidth: 1,
+    flex: 1,
+    flexDirection: 'row',
+    gap: 8,
     justifyContent: 'center',
-    minHeight: 54,
-    paddingHorizontal: spacing.md
+    height: 44,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2
   },
-  actionButtonPrimaryText: {
-    color: '#007AFF',
+  actionButtonText: {
+    color: '#334155',
     fontFamily: typography.body,
-    fontSize: typography.sizes.title,
-    fontWeight: '600',
-    lineHeight: 26
-  },
-  actionButtonDangerText: {
-    color: '#FF3B30',
-    fontFamily: typography.body,
-    fontSize: typography.sizes.title,
-    fontWeight: '600',
-    lineHeight: 26
+    fontSize: 14,
+    fontWeight: '500',
+    lineHeight: 20
   },
   pressed: {
     opacity: 0.82

@@ -144,7 +144,7 @@ export const translations = {
     detail_area_label: 'Area',
     detail_observed_label: 'Observed',
     detail_coordinates: 'Lat {{latitude}}, Lng {{longitude}}',
-    detail_navigate: 'Navigate',
+    detail_navigate: 'Get Directions',
     detail_navigate_pending: 'Navigation handoff is not connected yet in this build.',
     detail_notes_empty: 'No notes added for this entry.',
     detail_meta_empty: 'No contributor metadata available.',

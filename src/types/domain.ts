@@ -31,6 +31,7 @@ export type StoreComparison = {
   storeId: string;
   storeName: string;
   cityArea: string;
+  addressLine: string;
   latitude: number;
   longitude: number;
   latestPriceYen: number;

@@ -19,6 +19,7 @@ describe('buildStoreComparisons', () => {
       storeId: 'a',
       storeName: 'Store A',
       cityArea: 'Shibuya',
+      addressLine: '1 Chome-1 Shibuya',
       latitude: 35.6580,
       longitude: 139.7016,
       latestPriceYen: 980,
@@ -28,6 +29,7 @@ describe('buildStoreComparisons', () => {
       storeId: 'b',
       storeName: 'Store B',
       cityArea: 'Shibuya',
+      addressLine: '2 Chome-2 Shibuya',
       latitude: 35.6618,
       longitude: 139.7041,
       latestPriceYen: 1020,
@@ -37,6 +39,7 @@ describe('buildStoreComparisons', () => {
       storeId: 'c',
       storeName: 'Store C',
       cityArea: 'Shibuya',
+      addressLine: '3 Chome-3 Shibuya',
       latitude: 35.6656,
       longitude: 139.6984,
       latestPriceYen: 1120,
@@ -53,6 +56,7 @@ describe('buildStoreComparisons', () => {
     expect(ranked).toHaveLength(3);
     expect(ranked[0].tags).toContain('BEST');
     expect(ranked[0].storeId).toBe('a');
+    expect(ranked[0].addressLine).toBe('1 Chome-1 Shibuya');
     expect(ranked[0].score).toBeLessThanOrEqual(ranked[1].score);
     expect(ranked[1].score).toBeLessThanOrEqual(ranked[2].score);
   });
