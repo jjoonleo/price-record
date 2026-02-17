@@ -4,6 +4,8 @@ import { formatObservedAt } from './formatters';
 export type ProductPriceDetailRouteParams = {
   productId: string;
   productName: string;
+  priceEntryId: string;
+  entryId?: string;
   storeId: string;
   storeName: string;
   cityArea: string;
@@ -17,6 +19,7 @@ export type ProductPriceDetailRouteParams = {
 export type ParsedProductPriceDetailParams = {
   productId: string;
   productName: string;
+  priceEntryId: string;
   storeId: string;
   storeName: string;
   cityArea: string;
@@ -50,6 +53,8 @@ export const buildProductPriceDetailRouteParams = (
 ): ProductPriceDetailRouteParams => ({
   productId: product.id,
   productName: product.name,
+  priceEntryId: item.priceEntryId,
+  entryId: item.priceEntryId,
   storeId: item.storeId,
   storeName: item.storeName,
   cityArea: item.cityArea,
@@ -65,6 +70,7 @@ export const parseProductPriceDetailRouteParams = (
 ): ParsedProductPriceDetailParams | null => {
   const productId = toParamString(params.productId);
   const productName = toParamString(params.productName);
+  const priceEntryId = toParamString(params.priceEntryId ?? params.entryId);
   const storeId = toParamString(params.storeId);
   const storeName = toParamString(params.storeName);
   const cityArea = toParamString(params.cityArea);
@@ -77,6 +83,7 @@ export const parseProductPriceDetailRouteParams = (
   if (
     !productId ||
     !productName ||
+    !priceEntryId ||
     !storeId ||
     !storeName ||
     !cityArea ||
@@ -106,6 +113,7 @@ export const parseProductPriceDetailRouteParams = (
   return {
     productId,
     productName,
+    priceEntryId,
     storeId,
     storeName,
     cityArea,

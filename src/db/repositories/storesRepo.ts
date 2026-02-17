@@ -65,6 +65,23 @@ const mapStore = (row: StoreRow): Store => ({
   createdAt: row.created_at
 });
 
+export const getStoreById = async (id: string): Promise<Store | null> => {
+  if (Platform.OS === 'web') {
+    const store = readWebDb().stores.find((row) => row.id === id);
+    return store ? { ...store, nickname: normalizeNickname(store.nickname) } : null;
+  }
+
+  const row = await getFirstSql<StoreRow>(
+    `SELECT id, name, nickname, latitude, longitude, city_area, address_line, created_at
+     FROM stores
+     WHERE id = ?
+     LIMIT 1;`,
+    [id]
+  );
+
+  return row ? mapStore(row) : null;
+};
+
 export const findStoreByIdentity = async (input: StoreIdentityInput): Promise<Store | null> => {
   const name = input.name.trim();
   const cityArea = input.cityArea.trim();

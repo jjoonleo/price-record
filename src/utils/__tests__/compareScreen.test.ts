@@ -13,6 +13,7 @@ const createComparison = (
   score = 1
 ): StoreComparison => ({
   storeId,
+  priceEntryId: `entry-${storeId}`,
   storeName: `Store ${storeId}`,
   cityArea: 'Shibuya',
   latitude: 35.659,

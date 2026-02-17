@@ -1,11 +1,9 @@
 import {
-  CAPTURE_NOTES_LIMIT,
   createCaptureFormSchema,
   getCaptureFormDefaults
 } from '../formValidation';
 
 const messages = {
-  productRequired: 'product required',
   priceRequired: 'price required',
   priceInvalidInteger: 'price integer',
   pricePositive: 'price positive',
@@ -14,15 +12,13 @@ const messages = {
   dateRequired: 'date required',
   locationRequired: 'location required',
   addressRequired: 'address required',
-  coordinatesInvalid: 'coords invalid',
-  notesTooLong: 'notes too long'
+  coordinatesInvalid: 'coords invalid'
 };
 
 const schema = createCaptureFormSchema(messages);
 
 const createValidValues = () => ({
   ...getCaptureFormDefaults(),
-  productName: 'Green Tea',
   priceYen: '250',
   systemStoreName: 'Lawson Marunouchi',
   storeNickname: 'My Lawson',
@@ -39,15 +35,13 @@ describe('createCaptureFormSchema', () => {
     expect(result.success).toBe(true);
   });
 
-  test('requires product and system store names', () => {
+  test('requires system store names', () => {
     const result = schema.safeParse({
       ...createValidValues(),
-      productName: ' ',
       systemStoreName: ' '
     });
     expect(result.success).toBe(false);
     if (result.success) return;
-    expect(result.error.flatten().fieldErrors.productName).toContain(messages.productRequired);
     expect(result.error.flatten().fieldErrors.systemStoreName).toContain(messages.systemStoreRequired);
   });
 
@@ -111,16 +105,6 @@ describe('createCaptureFormSchema', () => {
     if (result.success) return;
     expect(result.error.flatten().fieldErrors.latitude).toContain(messages.coordinatesInvalid);
     expect(result.error.flatten().fieldErrors.longitude).toContain(messages.coordinatesInvalid);
-  });
-
-  test('rejects notes exceeding limit', () => {
-    const result = schema.safeParse({
-      ...createValidValues(),
-      notes: 'a'.repeat(CAPTURE_NOTES_LIMIT + 1)
-    });
-    expect(result.success).toBe(false);
-    if (result.success) return;
-    expect(result.error.flatten().fieldErrors.notes).toContain(messages.notesTooLong);
   });
 
   test('allows empty nickname', () => {

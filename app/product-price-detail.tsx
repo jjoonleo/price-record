@@ -1,6 +1,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { Alert, Platform, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { deletePriceEntry } from '../src/db/repositories/priceEntriesRepo';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   ProductPriceActionButtons,
@@ -17,6 +18,17 @@ import { openExternalRoute } from '../src/utils/externalMapNavigation';
 import { ProductPriceDetailRouteParams } from '../src/utils/productPriceDetail';
 
 const PRODUCT_FALLBACK_IMAGE = require('../public/images/product-price-detail/product-default.png');
+const toParamValue = (value: string | string[] | undefined): string | null => {
+  if (Array.isArray(value)) {
+    return value[0] ?? null;
+  }
+
+  if (typeof value === 'string') {
+    return value;
+  }
+
+  return null;
+};
 
 const formatCompactObservedAt = (observedAt: string, locale: string): string => {
   const date = new Date(observedAt);
@@ -56,6 +68,78 @@ export default function ProductPriceDetailScreen() {
 
   const handleBack = () => {
     router.navigate('/compare');
+  };
+
+  const handleEdit = () => {
+    if (!parsedParams) {
+      setStatusMessage(t('detail_edit_pending'));
+      return;
+    }
+
+    router.navigate({
+      pathname: '/capture',
+      params: {
+        mode: 'edit',
+        entryId: parsedParams.priceEntryId
+      }
+    });
+  };
+
+  const requestDeleteConfirmation = () => {
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && typeof window.confirm === 'function') {
+      return Promise.resolve(window.confirm(`${t('detail_delete_entry')}\n\n${t('detail_delete_confirm_body')}`));
+    }
+
+    return new Promise<boolean>((resolve) => {
+      Alert.alert(
+        t('detail_delete_entry'),
+        t('detail_delete_confirm_body'),
+        [
+          { text: t('cancel'), onPress: () => resolve(false), style: 'cancel' },
+          {
+            text: t('detail_delete_entry'),
+            style: 'destructive',
+            onPress: () => resolve(true)
+          }
+        ]
+      );
+    });
+  };
+
+  const handleDelete = async () => {
+    const fallbackEntryId = toParamValue(rawParams.entryId) ?? toParamValue(rawParams.priceEntryId);
+    if (!parsedParams || !parsedParams.priceEntryId) {
+      if (fallbackEntryId) {
+        const shouldDelete = await requestDeleteConfirmation();
+
+        if (!shouldDelete) {
+          return;
+        }
+
+        try {
+          await deletePriceEntry(fallbackEntryId);
+          router.navigate('/compare');
+        } catch (error) {
+          setStatusMessage(error instanceof Error ? error.message : t('save_error'));
+        }
+        return;
+      }
+
+      setStatusMessage(t('detail_delete_pending'));
+      return;
+    }
+
+    const shouldDelete = await requestDeleteConfirmation();
+    if (!shouldDelete) {
+      return;
+    }
+
+    try {
+      await deletePriceEntry(parsedParams.priceEntryId);
+      router.navigate('/compare');
+    } catch (error) {
+      setStatusMessage(error instanceof Error ? error.message : t('save_error'));
+    }
   };
 
   const handleNavigate = async () => {
@@ -126,8 +210,8 @@ export default function ProductPriceDetailScreen() {
             <ProductPriceActionButtons
               deleteLabel={t('detail_delete_entry')}
               editLabel={t('detail_edit_entry')}
-              onDelete={() => setStatusMessage(t('detail_delete_pending'))}
-              onEdit={() => setStatusMessage(t('detail_edit_pending'))}
+              onDelete={handleDelete}
+              onEdit={handleEdit}
               width={contentWidth}
             />
 

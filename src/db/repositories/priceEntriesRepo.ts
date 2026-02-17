@@ -1,11 +1,12 @@
-import { getAllSql, runSql } from '../client';
+import { getAllSql, getFirstSql, runSql } from '../client';
 import { createId } from '../../utils/id';
-import { HistoryEntry } from '../../types/domain';
+import { HistoryEntry, PriceEntry } from '../../types/domain';
 import { Platform } from 'react-native';
 import { readWebDb, updateWebDb } from '../webStore';
 import { getDisplayStoreName } from '../../utils/formatters';
 
 type LatestStorePriceRow = {
+  id: string;
   store_id: string;
   store_name: string;
   city_area: string;
@@ -14,6 +15,15 @@ type LatestStorePriceRow = {
   longitude: number;
   price_yen: number;
   observed_at: string;
+};
+
+type PriceEntryRow = {
+  id: string;
+  product_id: string;
+  store_id: string;
+  price_yen: number;
+  observed_at: string;
+  created_at: string;
 };
 
 type HistoryRow = {
@@ -30,6 +40,7 @@ type HistoryRow = {
 
 export type LatestStorePrice = {
   storeId: string;
+  priceEntryId: string;
   storeName: string;
   cityArea: string;
   addressLine: string;
@@ -46,6 +57,14 @@ export type CreatePriceEntryInput = {
   observedAt: string;
 };
 
+export type UpdatePriceEntryInput = {
+  id: string;
+  productId: string;
+  storeId: string;
+  priceYen: number;
+  observedAt: string;
+};
+
 export type HistoryFilters = {
   productId?: string;
   storeId?: string;
@@ -56,6 +75,7 @@ type LatestComparable = {
   storeId: string;
   observedAt: string;
   createdAt: string;
+  priceEntryId: string;
 };
 
 export const resolveStoreName = (
@@ -96,11 +116,12 @@ export const selectLatestByStore = <T extends LatestComparable>(rows: T[]): T[] 
   return [...latestMap.values()];
 };
 
-export const createPriceEntry = async (input: CreatePriceEntryInput): Promise<void> => {
+export const createPriceEntry = async (input: CreatePriceEntryInput): Promise<string> => {
   if (Platform.OS === 'web') {
+    const id = createId();
     updateWebDb((db) => {
       db.priceEntries.push({
-        id: createId(),
+        id,
         productId: input.productId,
         storeId: input.storeId,
         priceYen: input.priceYen,
@@ -108,7 +129,7 @@ export const createPriceEntry = async (input: CreatePriceEntryInput): Promise<vo
         createdAt: new Date().toISOString()
       });
     });
-    return;
+    return id;
   }
 
   const id = createId();
@@ -119,6 +140,119 @@ export const createPriceEntry = async (input: CreatePriceEntryInput): Promise<vo
      VALUES (?, ?, ?, ?, ?, ?);`,
     [id, input.productId, input.storeId, input.priceYen, input.observedAt, now]
   );
+
+  return id;
+};
+
+export const getPriceEntryById = async (id: string): Promise<PriceEntry | null> => {
+  if (Platform.OS === 'web') {
+    const db = readWebDb();
+    const row = db.priceEntries.find((entry) => entry.id === id);
+
+    if (!row) {
+      return null;
+    }
+
+    return {
+      id: row.id,
+      productId: row.productId,
+      storeId: row.storeId,
+      priceYen: row.priceYen,
+      observedAt: row.observedAt,
+      createdAt: row.createdAt
+    };
+  }
+
+  const row = await getFirstSql<PriceEntryRow>(
+    `SELECT id, product_id, store_id, price_yen, observed_at, created_at
+     FROM price_entries
+     WHERE id = ?
+     LIMIT 1;`,
+    [id]
+  );
+
+  if (!row) {
+    return null;
+  }
+
+  return {
+    id: row.id,
+    productId: row.product_id,
+    storeId: row.store_id,
+    priceYen: Number(row.price_yen),
+    observedAt: row.observed_at,
+    createdAt: row.created_at
+  };
+};
+
+export const updatePriceEntry = async (input: UpdatePriceEntryInput): Promise<void> => {
+  if (Platform.OS === 'web') {
+    let didUpdate = false;
+
+    updateWebDb((db) => {
+      const found = db.priceEntries.find((entry) => entry.id === input.id);
+      if (!found) {
+        return;
+      }
+
+      found.productId = input.productId;
+      found.storeId = input.storeId;
+      found.priceYen = input.priceYen;
+      found.observedAt = input.observedAt;
+      didUpdate = true;
+    });
+
+    if (!didUpdate) {
+      throw new Error('Price entry not found.');
+    }
+
+    return;
+  }
+
+  const exists = await getFirstSql<{ id: string }>(
+    `SELECT id FROM price_entries WHERE id = ? LIMIT 1;`,
+    [input.id]
+  );
+
+  if (!exists) {
+    throw new Error('Price entry not found.');
+  }
+
+  await runSql(
+    `UPDATE price_entries
+     SET product_id = ?, store_id = ?, price_yen = ?, observed_at = ?
+     WHERE id = ?;`,
+    [input.productId, input.storeId, input.priceYen, input.observedAt, input.id]
+  );
+};
+
+export const deletePriceEntry = async (id: string): Promise<void> => {
+  if (Platform.OS === 'web') {
+    let didDelete = false;
+
+    updateWebDb((db) => {
+      const initialLength = db.priceEntries.length;
+      db.priceEntries = db.priceEntries.filter((entry) => entry.id !== id);
+      didDelete = db.priceEntries.length !== initialLength;
+    });
+
+    if (!didDelete) {
+      throw new Error('Price entry not found.');
+    }
+
+    return;
+  }
+
+  const existing = await getFirstSql<{ id: string }>(
+    `SELECT id FROM price_entries WHERE id = ? LIMIT 1;`,
+    [id]
+  );
+
+  if (!existing) {
+    throw new Error('Price entry not found.');
+  }
+
+  await runSql(`DELETE FROM price_entries WHERE id = ?;`, [id]);
 };
 
 export const getLatestStorePricesByProduct = async (
@@ -129,55 +263,59 @@ export const getLatestStorePricesByProduct = async (
     const area = cityArea?.trim() || null;
     const db = readWebDb();
     const storeById = new Map(db.stores.map((store) => [store.id, store]));
-    const latestByStore = new Map<string, { priceYen: number; observedAt: string; createdAt: string }>();
+    const latestByStore = new Map<
+      string,
+      { priceEntryId: string; priceYen: number; observedAt: string; createdAt: string }
+    >();
 
-    db.priceEntries.forEach((entry) => {
-      if (entry.productId !== productId) {
-        return;
-      }
+    db.priceEntries
+      .filter((entry) => entry.productId === productId)
+      .forEach((entry) => {
+        const store = storeById.get(entry.storeId);
+        if (!store) {
+          return;
+        }
 
-      const store = storeById.get(entry.storeId);
-      if (!store) {
-        return;
-      }
+        if (area && store.cityArea !== area) {
+          return;
+        }
 
-      if (area && store.cityArea !== area) {
-        return;
-      }
-
-      const current = latestByStore.get(entry.storeId);
-      if (!current) {
-        latestByStore.set(entry.storeId, {
-          priceYen: entry.priceYen,
-          observedAt: entry.observedAt,
-          createdAt: entry.createdAt
-        });
-        return;
-      }
-
-      const currentObserved = new Date(current.observedAt).getTime();
-      const nextObserved = new Date(entry.observedAt).getTime();
-      if (nextObserved > currentObserved) {
-        latestByStore.set(entry.storeId, {
-          priceYen: entry.priceYen,
-          observedAt: entry.observedAt,
-          createdAt: entry.createdAt
-        });
-        return;
-      }
-
-      if (nextObserved === currentObserved) {
-        const currentCreated = new Date(current.createdAt).getTime();
-        const nextCreated = new Date(entry.createdAt).getTime();
-        if (nextCreated > currentCreated) {
+        const current = latestByStore.get(entry.storeId);
+        if (!current) {
           latestByStore.set(entry.storeId, {
+            priceEntryId: entry.id,
             priceYen: entry.priceYen,
             observedAt: entry.observedAt,
             createdAt: entry.createdAt
           });
+          return;
         }
-      }
-    });
+
+        const currentObserved = new Date(current.observedAt).getTime();
+        const nextObserved = new Date(entry.observedAt).getTime();
+        if (nextObserved > currentObserved) {
+          latestByStore.set(entry.storeId, {
+            priceEntryId: entry.id,
+            priceYen: entry.priceYen,
+            observedAt: entry.observedAt,
+            createdAt: entry.createdAt
+          });
+          return;
+        }
+
+        if (nextObserved === currentObserved) {
+          const currentCreated = new Date(current.createdAt).getTime();
+          const nextCreated = new Date(entry.createdAt).getTime();
+          if (nextCreated > currentCreated) {
+            latestByStore.set(entry.storeId, {
+              priceEntryId: entry.id,
+              priceYen: entry.priceYen,
+              observedAt: entry.observedAt,
+              createdAt: entry.createdAt
+            });
+          }
+        }
+      });
 
     return [...latestByStore.entries()]
       .map(([storeId, latest]) => {
@@ -185,8 +323,10 @@ export const getLatestStorePricesByProduct = async (
         if (!store) {
           return null;
         }
+
         return {
           storeId,
+          priceEntryId: latest.priceEntryId,
           storeName: resolveStoreName(store),
           cityArea: store.cityArea,
           addressLine: store.addressLine,
@@ -210,6 +350,7 @@ export const getLatestStorePricesByProduct = async (
   const rows = await getAllSql<LatestStorePriceRow>(
     `WITH ranked_entries AS (
       SELECT
+        pe.id,
         pe.store_id,
         pe.price_yen,
         pe.observed_at,
@@ -229,6 +370,7 @@ export const getLatestStorePricesByProduct = async (
         AND (? IS NULL OR s.city_area = ?)
     )
     SELECT
+      id,
       store_id,
       store_name,
       city_area,
@@ -245,6 +387,7 @@ export const getLatestStorePricesByProduct = async (
 
   return rows.map((row) => ({
     storeId: row.store_id,
+    priceEntryId: row.id,
     storeName: row.store_name,
     cityArea: row.city_area,
     addressLine: row.address_line ?? '',

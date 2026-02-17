@@ -14,6 +14,7 @@ describe('buildProductPriceDetailView', () => {
         productName: 'Matcha KitKat',
         storeId: 's1',
         storeName: 'MEGA Don Quijote',
+        priceEntryId: 'entry-1',
         cityArea: 'Shibuya, Tokyo',
         latitude: 35.658,
         longitude: 139.7016,

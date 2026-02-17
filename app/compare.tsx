@@ -86,6 +86,22 @@ export default function CompareScreen() {
     [router, selectedProduct, setStatusMessage, t]
   );
 
+  const openSelectedProductEdit = useCallback(() => {
+    if (!selectedProduct) {
+      setStatusMessage(t('no_item_selected'));
+      return;
+    }
+
+    router.navigate({
+      pathname: '/product-form',
+      params: {
+        mode: 'edit',
+        productId: selectedProduct.id,
+        returnRoute: '/compare'
+      }
+    });
+  }, [router, selectedProduct, setStatusMessage, t]);
+
   const handleViewFullHistory = useCallback(() => {
     applyFullHistoryFilter();
     router.navigate('/history');
@@ -139,7 +155,9 @@ export default function CompareScreen() {
             title={t('compare_header_title')}
             backLabel={t('back')}
             onBack={() => router.navigate('/capture')}
-            onAction={() => router.navigate('/capture')}
+            onAction={openSelectedProductEdit}
+            actionLabel={t('compare_edit_product')}
+            actionAccessibilityLabel={t('compare_edit_product_a11y')}
           />
 
           <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">

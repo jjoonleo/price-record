@@ -3,6 +3,7 @@ import { StoreComparison } from '../../types/domain';
 export const storeComparisonsFixture: StoreComparison[] = [
   {
     storeId: 'store-shinjuku-central',
+    priceEntryId: 'entry-shinjuku-central',
     storeName: 'Shinjuku Central',
     cityArea: 'Shinjuku',
     addressLine: '3 Chome-1-26 Shinjuku, Tokyo',
@@ -16,6 +17,7 @@ export const storeComparisonsFixture: StoreComparison[] = [
   },
   {
     storeId: 'store-tokyo-station-mart',
+    priceEntryId: 'entry-tokyo-station-mart',
     storeName: 'Tokyo Station Mart',
     cityArea: 'Marunouchi',
     addressLine: '1 Chome-9 Marunouchi, Tokyo',
@@ -29,6 +31,7 @@ export const storeComparisonsFixture: StoreComparison[] = [
   },
   {
     storeId: 'store-kyoto-corner',
+    priceEntryId: 'entry-kyoto-corner',
     storeName: 'Kyoto Corner',
     cityArea: 'Kyoto Station',
     addressLine: 'Higashishiokoji Kamadonocho, Kyoto',

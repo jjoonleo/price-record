@@ -4,6 +4,7 @@ export type WebProduct = {
   id: string;
   name: string;
   normalizedName: string;
+  note: string;
   createdAt: string;
 };
 
@@ -72,8 +73,15 @@ export const readWebDb = (): WebDb => {
         }))
       : [];
 
+    const products = Array.isArray(parsed.products)
+      ? parsed.products.map((product) => ({
+          ...product,
+          note: typeof product?.note === 'string' ? product.note : ''
+        }))
+      : [];
+
     return {
-      products: Array.isArray(parsed.products) ? parsed.products : [],
+      products,
       stores,
       priceEntries: Array.isArray(parsed.priceEntries) ? parsed.priceEntries : []
     };
