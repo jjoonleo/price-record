@@ -1,6 +1,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Alert, Platform, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { getProductById } from '../src/db/repositories/productsRepo';
 import { deletePriceEntry } from '../src/db/repositories/priceEntriesRepo';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -15,9 +16,8 @@ import { useProductPriceDetailController } from '../src/features/productPriceDet
 import { useI18n } from '../src/i18n/useI18n';
 import { spacing } from '../src/theme/tokens';
 import { openExternalRoute } from '../src/utils/externalMapNavigation';
+import { resolveProductImageSource } from '../src/utils/productImage';
 import { ProductPriceDetailRouteParams } from '../src/utils/productPriceDetail';
-
-const PRODUCT_FALLBACK_IMAGE = require('../public/images/product-price-detail/product-default.png');
 const toParamValue = (value: string | string[] | undefined): string | null => {
   if (Array.isArray(value)) {
     return value[0] ?? null;
@@ -50,6 +50,7 @@ export default function ProductPriceDetailScreen() {
   const frameWidth = Math.min(width - spacing.md * 2, 390);
   const contentWidth = frameWidth - spacing.md * 2;
   const [isFavorite, setIsFavorite] = useState(false);
+  const [productImageUri, setProductImageUri] = useState('');
 
   const rawParams = useLocalSearchParams<ProductPriceDetailRouteParams>();
   const { parsedParams, detailView, statusMessage, setStatusMessage } = useProductPriceDetailController({
@@ -65,6 +66,35 @@ export default function ProductPriceDetailScreen() {
 
     return formatCompactObservedAt(parsedParams.observedAt, locale);
   }, [locale, parsedParams]);
+
+  useEffect(() => {
+    if (!parsedParams) {
+      setProductImageUri('');
+      return;
+    }
+
+    let didCancel = false;
+
+    void (async () => {
+      try {
+        const product = await getProductById(parsedParams.productId);
+        if (didCancel) {
+          return;
+        }
+
+        setProductImageUri(product?.imageUri ?? '');
+      } catch {
+        if (didCancel) {
+          return;
+        }
+        setProductImageUri('');
+      }
+    })();
+
+    return () => {
+      didCancel = true;
+    };
+  }, [parsedParams]);
 
   const handleBack = () => {
     router.navigate('/compare');
@@ -200,7 +230,7 @@ export default function ProductPriceDetailScreen() {
             />
 
             <ProductPriceEntryCard
-              imageSource={PRODUCT_FALLBACK_IMAGE}
+              imageSource={resolveProductImageSource(productImageUri)}
               observedLabel={compactObservedLabel}
               priceLabel={`¥${detailView.priceText}`}
               productName={parsedParams.productName}

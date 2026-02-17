@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useEffect, useMemo } from 'react';
 import { Controller, SubmitErrorHandler, SubmitHandler, useForm } from 'react-hook-form';
-import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import { Image, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, radius, spacing, typography } from '../../theme/tokens';
 import {
@@ -10,21 +10,30 @@ import {
   ProductFormValues
 } from './schema';
 import { PrimaryButton } from '../../components/ui/PrimaryButton';
+import { resolveProductImageSource } from '../../utils/productImage';
 
 type ProductFormScreenProps = {
   isSaving: boolean;
   isLoading: boolean;
   nameLabel: string;
   noteLabel: string;
+  imageLabel: string;
+  imagePickLibraryLabel: string;
+  imageTakePhotoLabel: string;
+  imageRemoveLabel: string;
   namePlaceholder: string;
   notePlaceholder: string;
   backLabel: string;
   headerTitle: string;
   submitLabel: string;
+  imageUri: string;
   initialValues?: ProductFormValues;
   statusMessage: string | null;
   onSubmit: SubmitHandler<ProductFormValues>;
   onCancel: () => void;
+  onPickImageFromLibrary: () => void;
+  onTakePhoto: () => void;
+  onRemoveImage: () => void;
   saveNameRequiredMessage: string;
   saveNoteTooLongMessage: string;
 };
@@ -34,15 +43,23 @@ export const ProductFormScreen = ({
   isLoading,
   nameLabel,
   noteLabel,
+  imageLabel,
+  imagePickLibraryLabel,
+  imageTakePhotoLabel,
+  imageRemoveLabel,
   namePlaceholder,
   notePlaceholder,
   backLabel,
   headerTitle,
   submitLabel,
+  imageUri,
   initialValues,
   statusMessage,
   onSubmit,
   onCancel,
+  onPickImageFromLibrary,
+  onTakePhoto,
+  onRemoveImage,
   saveNameRequiredMessage,
   saveNoteTooLongMessage
 }: ProductFormScreenProps) => {
@@ -101,6 +118,53 @@ export const ProductFormScreen = ({
 
         <View style={[styles.main, { width: frameWidth }]}>
           <View style={styles.card}>
+            <View style={styles.field}>
+              <Text style={styles.label}>{imageLabel}</Text>
+              <View style={styles.imagePreviewWrap}>
+                <Image source={resolveProductImageSource(imageUri)} style={styles.imagePreview} />
+              </View>
+              <View style={styles.imageActionsRow}>
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={isLoading || isSaving}
+                  onPress={onPickImageFromLibrary}
+                  style={({ pressed }) => [
+                    styles.imageActionButton,
+                    (isLoading || isSaving) && styles.imageActionButtonDisabled,
+                    pressed && styles.pressed
+                  ]}
+                >
+                  <Text style={styles.imageActionText}>{imagePickLibraryLabel}</Text>
+                </Pressable>
+
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={isLoading || isSaving}
+                  onPress={onTakePhoto}
+                  style={({ pressed }) => [
+                    styles.imageActionButton,
+                    (isLoading || isSaving) && styles.imageActionButtonDisabled,
+                    pressed && styles.pressed
+                  ]}
+                >
+                  <Text style={styles.imageActionText}>{imageTakePhotoLabel}</Text>
+                </Pressable>
+
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={isLoading || isSaving || !imageUri.trim()}
+                  onPress={onRemoveImage}
+                  style={({ pressed }) => [
+                    styles.imageActionButton,
+                    (isLoading || isSaving || !imageUri.trim()) && styles.imageActionButtonDisabled,
+                    pressed && styles.pressed
+                  ]}
+                >
+                  <Text style={styles.imageActionText}>{imageRemoveLabel}</Text>
+                </Pressable>
+              </View>
+            </View>
+
             <View style={styles.field}>
               <Text style={styles.label}>{nameLabel}</Text>
               <Controller
@@ -231,6 +295,46 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     minHeight: 48,
     padding: spacing.sm
+  },
+  imagePreviewWrap: {
+    alignItems: 'center',
+    backgroundColor: colors.surfaceMuted,
+    borderColor: colors.borderSubtle,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    justifyContent: 'center',
+    minHeight: 160,
+    overflow: 'hidden',
+    paddingVertical: spacing.sm
+  },
+  imagePreview: {
+    borderRadius: radius.sm,
+    height: 132,
+    width: 132
+  },
+  imageActionsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+    marginTop: spacing.sm
+  },
+  imageActionButton: {
+    backgroundColor: colors.surfaceMuted,
+    borderColor: colors.borderSubtle,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    minHeight: 32,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs
+  },
+  imageActionButtonDisabled: {
+    opacity: 0.45
+  },
+  imageActionText: {
+    color: colors.primary,
+    fontFamily: typography.body,
+    fontSize: typography.sizes.caption,
+    fontWeight: '600'
   },
   noteInput: {
     minHeight: 110

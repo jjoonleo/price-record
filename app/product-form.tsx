@@ -4,6 +4,11 @@ import { Alert } from 'react-native';
 import { createProduct, getProductById, updateProduct } from '../src/db/repositories/productsRepo';
 import { ProductFormScreen } from '../src/features/productForm/ProductFormScreen';
 import {
+  captureProductImageWithCamera,
+  pickProductImageFromLibrary,
+  ProductImageError
+} from '../src/features/productForm/productImage';
+import {
   getProductFormDefaults,
   ProductFormValues
 } from '../src/features/productForm/schema';
@@ -44,11 +49,13 @@ export default function ProductFormRoute() {
   const [initialValues, setInitialValues] = useState<ProductFormValues>(getProductFormDefaults());
   const [isLoadingProduct, setIsLoadingProduct] = useState(isEditMode);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [imageUri, setImageUri] = useState('');
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isEditMode) {
       setInitialValues(getProductFormDefaults());
+      setImageUri('');
       setIsLoadingProduct(false);
       return;
     }
@@ -56,30 +63,105 @@ export default function ProductFormRoute() {
     let didCancel = false;
     setIsLoadingProduct(true);
     setStatusMessage(null);
+    const targetProductId = productId;
+
+    if (!targetProductId) {
+      setStatusMessage(t('product_form_not_found'));
+      setImageUri('');
+      setIsLoadingProduct(false);
+      return;
+    }
 
     void (async () => {
-      const product = await getProductById(productId);
-      if (didCancel) {
-        return;
-      }
+      try {
+        const product = await getProductById(targetProductId);
+        if (didCancel) {
+          return;
+        }
 
-      if (!product) {
-        setStatusMessage(t('product_form_not_found'));
+        if (!product) {
+          setStatusMessage(t('product_form_not_found'));
+          setImageUri('');
+          setIsLoadingProduct(false);
+          return;
+        }
+
+        setInitialValues({
+          name: product.name,
+          note: product.note
+        });
+        setImageUri(product.imageUri);
         setIsLoadingProduct(false);
-        return;
+      } catch (error) {
+        if (didCancel) {
+          return;
+        }
+        setStatusMessage(error instanceof Error ? error.message : t('save_error'));
+        setIsLoadingProduct(false);
       }
-
-      setInitialValues({
-        name: product.name,
-        note: product.note
-      });
-      setIsLoadingProduct(false);
     })();
 
     return () => {
       didCancel = true;
     };
   }, [isEditMode, productId, t]);
+
+  const toImageErrorMessage = useCallback(
+    (error: unknown): string => {
+      if (error instanceof ProductImageError) {
+        if (error.code === 'permission_denied') {
+          return t('product_form_image_permission_denied');
+        }
+
+        if (error.code === 'too_large') {
+          return t('product_form_image_too_large');
+        }
+
+        return t('product_form_image_processing_failed');
+      }
+
+      return error instanceof Error ? error.message : t('product_form_image_processing_failed');
+    },
+    [t]
+  );
+
+  const runImageSelection = useCallback(
+    async (picker: () => Promise<string | null>) => {
+      if (isSubmitting || isLoadingProduct) {
+        return;
+      }
+
+      try {
+        const nextImageUri = await picker();
+        if (!nextImageUri) {
+          return;
+        }
+
+        setImageUri(nextImageUri);
+        setStatusMessage(t('product_form_image_selected_status'));
+      } catch (error) {
+        setStatusMessage(toImageErrorMessage(error));
+      }
+    },
+    [isLoadingProduct, isSubmitting, t, toImageErrorMessage]
+  );
+
+  const onPickImageFromLibrary = useCallback(() => {
+    void runImageSelection(pickProductImageFromLibrary);
+  }, [runImageSelection]);
+
+  const onTakePhoto = useCallback(() => {
+    void runImageSelection(captureProductImageWithCamera);
+  }, [runImageSelection]);
+
+  const onRemoveImage = useCallback(() => {
+    if (!imageUri.trim()) {
+      return;
+    }
+
+    setImageUri('');
+    setStatusMessage(t('product_form_image_removed_status'));
+  }, [imageUri, t]);
 
   const returnToCaller = useCallback(
     (savedProductId: string) => {
@@ -114,11 +196,13 @@ export default function ProductFormRoute() {
         ? await updateProduct({
             id: productId ?? '',
             name: values.name,
-            note: values.note
+            note: values.note,
+            imageUri
           })
         : await createProduct({
             name: values.name,
-            note: values.note
+            note: values.note,
+            imageUri
           });
 
       setStatusMessage(
@@ -154,17 +238,25 @@ export default function ProductFormRoute() {
       isLoading={isLoadingProduct}
       backLabel={t('back')}
       headerTitle={formTitle}
+      imageLabel={t('product_form_image_label')}
+      imagePickLibraryLabel={t('product_form_image_pick_library')}
+      imageTakePhotoLabel={t('product_form_image_take_photo')}
+      imageRemoveLabel={t('product_form_image_remove')}
       nameLabel={t('product_form_name_label')}
       noteLabel={t('product_form_note_label')}
       namePlaceholder={t('product_form_name_placeholder')}
       notePlaceholder={t('product_form_note_placeholder')}
       submitLabel={submitLabel}
+      imageUri={imageUri}
       initialValues={initialValues}
       statusMessage={statusMessage}
       onSubmit={submitForm}
       onCancel={() => {
         router.back();
       }}
+      onPickImageFromLibrary={onPickImageFromLibrary}
+      onTakePhoto={onTakePhoto}
+      onRemoveImage={onRemoveImage}
       saveNameRequiredMessage={t('product_form_name_required')}
       saveNoteTooLongMessage={t('product_form_note_too_long')}
     />

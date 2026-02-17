@@ -1,7 +1,7 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useMemo, useState } from 'react';
 import { getLatestStorePricesByProduct } from '../../../db/repositories/priceEntriesRepo';
-import { listProductOptions } from '../../../db/repositories/productsRepo';
+import { getProductById, listProductOptions } from '../../../db/repositories/productsRepo';
 import { captureCurrentLocation } from '../../../services/locationService';
 import { buildStoreComparisons } from '../../../services/rankingService';
 import { useFiltersStore } from '../../../state/useFiltersStore';
@@ -21,6 +21,7 @@ type Translate = (key: TranslationKey, params?: Record<string, string | number>)
 
 export type CompareScreenController = {
   selectedProduct: ProductOption | null;
+  selectedProductImageUri: string;
   comparisons: StoreComparison[];
   topChoice: StoreComparison | null;
   hasLocation: boolean;
@@ -41,6 +42,7 @@ export const useCompareScreenController = (t: Translate): CompareScreenControlle
 
   const [products, setProducts] = useState<ProductOption[]>([]);
   const [comparisons, setComparisons] = useState<StoreComparison[]>([]);
+  const [selectedProductImageUri, setSelectedProductImageUri] = useState('');
   const [userLocation, setUserLocation] = useState<Coordinates | undefined>();
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -69,6 +71,11 @@ export const useCompareScreenController = (t: Translate): CompareScreenControlle
         setSelectedProductId(resolvedProductId);
         clearHistoryStoreFilter();
       }
+
+      const selectedProductDetails = resolvedProductId
+        ? await getProductById(resolvedProductId)
+        : null;
+      setSelectedProductImageUri(selectedProductDetails?.imageUri ?? '');
 
       const resolvedLocation = locationResult.status === 'granted' ? locationResult.coordinates : undefined;
       setUserLocation(resolvedLocation);
@@ -129,6 +136,7 @@ export const useCompareScreenController = (t: Translate): CompareScreenControlle
 
   return {
     selectedProduct,
+    selectedProductImageUri,
     comparisons,
     topChoice,
     hasLocation,

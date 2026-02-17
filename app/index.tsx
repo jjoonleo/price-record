@@ -14,49 +14,17 @@ import {
   useWindowDimensions
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { getProductById } from '../src/db/repositories/productsRepo';
 import { listHistoryEntries } from '../src/db/repositories/priceEntriesRepo';
+import { buildLatestEntriesByProduct, filterHomeListItems, HomeListItem } from '../src/features/home/homeListModel';
 import { useI18n } from '../src/i18n/useI18n';
 import { useFiltersStore } from '../src/state/useFiltersStore';
 import { colors, spacing, typography } from '../src/theme/tokens';
-import { getHomeProductImage } from '../src/features/home/homeImageMap';
-import { buildLatestEntriesByProduct, filterHomeListItems, HomeListItem } from '../src/features/home/homeListModel';
 import { formatYen } from '../src/utils/formatters';
-
-const fallbackTileColors = ['#DBEAFE', '#E0F2FE', '#F3F4F6', '#F1F5F9'] as const;
+import { resolveProductImageSource } from '../src/utils/productImage';
 
 const toPriceLabel = (value: number, locale: string): string =>
   formatYen(value, locale).replace('JP¥', '¥').replace(/\u00A0/g, '');
-
-const hashString = (value: string): number => {
-  let hash = 0;
-  for (let index = 0; index < value.length; index += 1) {
-    hash = (hash * 31 + value.charCodeAt(index)) >>> 0;
-  }
-  return hash;
-};
-
-const resolveFallbackVisual = (
-  productName: string
-): {
-  backgroundColor: string;
-  iconName: keyof typeof MaterialCommunityIcons.glyphMap;
-} => {
-  const normalized = productName.toLowerCase();
-  const hashedIndex = hashString(normalized) % fallbackTileColors.length;
-
-  if (normalized.includes('tablet') || normalized.includes('pill')) {
-    return { backgroundColor: '#DBEAFE', iconName: 'pill' };
-  }
-
-  if (normalized.includes('camera') || normalized.includes('instax')) {
-    return { backgroundColor: '#DBEAFE', iconName: 'camera' };
-  }
-
-  return {
-    backgroundColor: fallbackTileColors[hashedIndex],
-    iconName: 'package-variant-closed'
-  };
-};
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -68,6 +36,7 @@ export default function HomeScreen() {
 
   const [searchText, setSearchText] = useState('');
   const [items, setItems] = useState<HomeListItem[]>([]);
+  const [productImageById, setProductImageById] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -77,9 +46,23 @@ export default function HomeScreen() {
 
     try {
       const rows = await listHistoryEntries({ limit: 500 });
-      setItems(buildLatestEntriesByProduct(rows));
+      const latestItems = buildLatestEntriesByProduct(rows);
+      const productIds = [...new Set(latestItems.map((item) => item.productId))];
+      const products = await Promise.all(productIds.map((id) => getProductById(id)));
+      const nextImageById: Record<string, string> = {};
+
+      products.forEach((product) => {
+        if (!product) {
+          return;
+        }
+        nextImageById[product.id] = product.imageUri;
+      });
+
+      setItems(latestItems);
+      setProductImageById(nextImageById);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : t('home_load_error'));
+      setProductImageById({});
     } finally {
       setIsLoading(false);
     }
@@ -162,8 +145,7 @@ export default function HomeScreen() {
           {!isLoading && !errorMessage && filteredItems.length > 0 ? (
             <View style={styles.listCard}>
               {filteredItems.map((item, index) => {
-                const mappedImage = getHomeProductImage(item.productName);
-                const fallbackVisual = resolveFallbackVisual(item.productName);
+                const imageSource = resolveProductImageSource(productImageById[item.productId]);
 
                 return (
                   <Pressable
@@ -177,17 +159,8 @@ export default function HomeScreen() {
                     ]}
                   >
                     <View style={styles.thumbnailFrame}>
-                      <View
-                        style={[
-                          styles.thumbnailBackground,
-                          { backgroundColor: mappedImage?.backgroundColor ?? fallbackVisual.backgroundColor }
-                        ]}
-                      >
-                        {mappedImage ? (
-                          <Image source={{ uri: mappedImage.uri }} style={styles.thumbnailImage} />
-                        ) : (
-                          <MaterialCommunityIcons color={colors.primary} name={fallbackVisual.iconName} size={17} />
-                        )}
+                      <View style={styles.thumbnailBackground}>
+                        <Image source={imageSource} style={styles.thumbnailImage} />
                       </View>
                     </View>
 
@@ -356,10 +329,9 @@ const styles = StyleSheet.create({
     width: 40
   },
   thumbnailBackground: {
-    alignItems: 'center',
+    backgroundColor: colors.surfaceMuted,
     borderRadius: 6,
     height: 40,
-    justifyContent: 'center',
     overflow: 'hidden',
     width: 40
   },

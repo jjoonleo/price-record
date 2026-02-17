@@ -2,13 +2,14 @@ import { getAllSql, getFirstSql, runSql } from '../client';
 import { createId } from '../../utils/id';
 import { Product, ProductOption } from '../../types/domain';
 import { Platform } from 'react-native';
-import { readWebDb, updateWebDb } from '../webStore';
+import { WebProduct, readWebDb, updateWebDb } from '../webStore';
 
 type ProductRow = {
   id: string;
   name: string;
   normalized_name: string;
   note: string | null;
+  image_uri: string | null;
   created_at: string;
 };
 
@@ -22,26 +23,39 @@ export const normalizeProductName = (input: string): string => {
   return input.trim().toLowerCase().replace(/\s+/g, ' ');
 };
 
-const mapProduct = (row: ProductRow): Product => ({
+const mapNativeProduct = (row: ProductRow): Product => ({
   id: row.id,
   name: row.name,
   normalizedName: row.normalized_name,
   note: row.note ?? '',
+  imageUri: row.image_uri ?? '',
   createdAt: row.created_at
+});
+
+const mapWebProduct = (row: WebProduct): Product => ({
+  id: row.id,
+  name: row.name,
+  normalizedName: row.normalizedName,
+  note: row.note ?? '',
+  imageUri: row.imageUri ?? '',
+  createdAt: row.createdAt
 });
 
 type CreateProductInput = {
   name: string;
   note: string;
+  imageUri: string;
 };
 
 type UpdateProductInput = {
   id: string;
   name: string;
   note: string;
+  imageUri: string;
 };
 
 const normalizeProductNote = (input: string): string => input.trim();
+const normalizeProductImageUri = (input: string): string => input.trim();
 
 export const createProduct = async (input: CreateProductInput): Promise<Product> => {
   const cleanedName = input.name.trim();
@@ -50,6 +64,7 @@ export const createProduct = async (input: CreateProductInput): Promise<Product>
   }
 
   const note = normalizeProductNote(input.note);
+  const imageUri = normalizeProductImageUri(input.imageUri);
 
   const normalized = normalizeProductName(cleanedName);
 
@@ -57,7 +72,7 @@ export const createProduct = async (input: CreateProductInput): Promise<Product>
     const existing = readWebDb().products.find((row) => row.normalizedName === normalized);
 
     if (existing) {
-      return existing;
+      return mapWebProduct(existing);
     }
 
     const now = new Date().toISOString();
@@ -66,6 +81,7 @@ export const createProduct = async (input: CreateProductInput): Promise<Product>
       name: cleanedName,
       normalizedName: normalized,
       note,
+      imageUri,
       createdAt: now
     };
 
@@ -77,7 +93,7 @@ export const createProduct = async (input: CreateProductInput): Promise<Product>
   }
 
   const existing = await getFirstSql<ProductRow>(
-    `SELECT id, name, normalized_name, note, created_at
+    `SELECT id, name, normalized_name, note, image_uri, created_at
      FROM products
      WHERE normalized_name = ?
      LIMIT 1;`,
@@ -85,16 +101,16 @@ export const createProduct = async (input: CreateProductInput): Promise<Product>
   );
 
   if (existing) {
-    return mapProduct(existing);
+    return mapNativeProduct(existing);
   }
 
   const now = new Date().toISOString();
   const id = createId();
 
   await runSql(
-    `INSERT INTO products (id, name, normalized_name, note, created_at)
-     VALUES (?, ?, ?, ?, ?);`,
-    [id, cleanedName, normalized, note, now]
+    `INSERT INTO products (id, name, normalized_name, note, image_uri, created_at)
+     VALUES (?, ?, ?, ?, ?, ?);`,
+    [id, cleanedName, normalized, note, imageUri, now]
   );
 
   return {
@@ -102,6 +118,7 @@ export const createProduct = async (input: CreateProductInput): Promise<Product>
     name: cleanedName,
     normalizedName: normalized,
     note,
+    imageUri,
     createdAt: now
   };
 };
@@ -113,6 +130,7 @@ export const updateProduct = async (input: UpdateProductInput): Promise<Product>
   }
 
   const note = normalizeProductNote(input.note);
+  const imageUri = normalizeProductImageUri(input.imageUri);
   const normalized = normalizeProductName(cleanedName);
 
   if (Platform.OS === 'web') {
@@ -140,6 +158,7 @@ export const updateProduct = async (input: UpdateProductInput): Promise<Product>
       target.name = cleanedName;
       target.normalizedName = normalized;
       target.note = note;
+      target.imageUri = imageUri;
     });
 
     return {
@@ -147,12 +166,13 @@ export const updateProduct = async (input: UpdateProductInput): Promise<Product>
       name: cleanedName,
       normalizedName: normalized,
       note,
+      imageUri,
       createdAt: existing.createdAt
     };
   }
 
   const existing = await getFirstSql<ProductRow>(
-    `SELECT id, name, normalized_name, note, created_at
+    `SELECT id, name, normalized_name, note, image_uri, created_at
      FROM products
      WHERE id = ?
      LIMIT 1;`,
@@ -164,7 +184,7 @@ export const updateProduct = async (input: UpdateProductInput): Promise<Product>
   }
 
   const conflict = await getFirstSql<ProductRow>(
-    `SELECT id, name, normalized_name, note, created_at
+    `SELECT id, name, normalized_name, note, image_uri, created_at
      FROM products
      WHERE normalized_name = ? AND id != ?
      LIMIT 1;`,
@@ -175,10 +195,11 @@ export const updateProduct = async (input: UpdateProductInput): Promise<Product>
     throw new Error('Another product with the same name already exists.');
   }
 
-  await runSql(`UPDATE products SET name = ?, normalized_name = ?, note = ? WHERE id = ?;`, [
+  await runSql(`UPDATE products SET name = ?, normalized_name = ?, note = ?, image_uri = ? WHERE id = ?;`, [
     cleanedName,
     normalized,
     note,
+    imageUri,
     input.id
   ]);
 
@@ -187,12 +208,13 @@ export const updateProduct = async (input: UpdateProductInput): Promise<Product>
     name: cleanedName,
     normalizedName: normalized,
     note,
+    imageUri,
     createdAt: existing.created_at
   };
 };
 
 export const getOrCreateProduct = async (name: string): Promise<Product> => {
-  return createProduct({ name, note: '' });
+  return createProduct({ name, note: '', imageUri: '' });
 };
 
 export const listProductOptions = async (query?: string): Promise<ProductOption[]> => {
@@ -247,16 +269,16 @@ export const listProductOptions = async (query?: string): Promise<ProductOption[
 export const getProductById = async (id: string): Promise<Product | null> => {
   if (Platform.OS === 'web') {
     const row = readWebDb().products.find((row) => row.id === id);
-    return row ? mapProduct(row) : null;
+    return row ? mapWebProduct(row) : null;
   }
 
   const row = await getFirstSql<ProductRow>(
-    `SELECT id, name, normalized_name, note, created_at
+    `SELECT id, name, normalized_name, note, image_uri, created_at
      FROM products
      WHERE id = ?
      LIMIT 1;`,
     [id]
   );
 
-  return row ? mapProduct(row) : null;
+  return row ? mapNativeProduct(row) : null;
 };

@@ -17,9 +17,8 @@ import { useI18n } from '../src/i18n/useI18n';
 import { spacing, typography, colors } from '../src/theme/tokens';
 import { ProductOption, StoreComparison } from '../src/types/domain';
 import { buildProductPriceDetailRouteParams } from '../src/utils/productPriceDetail';
+import { resolveProductImageSource } from '../src/utils/productImage';
 import { formatYen } from '../src/utils/formatters';
-
-const productPlaceholderImage = require('../src/assets/compare-placeholder.png');
 
 const DEVICE_FRAME_WIDTH = 390;
 
@@ -44,6 +43,7 @@ export default function CompareScreen() {
 
   const {
     selectedProduct,
+    selectedProductImageUri,
     topChoice,
     hasLocation,
     isLoading,
@@ -163,7 +163,7 @@ export default function CompareScreen() {
           <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
             <View style={styles.contentColumn}>
               <CompareHero
-                imageSource={productPlaceholderImage}
+                imageSource={resolveProductImageSource(selectedProductImageUri)}
                 productName={selectedProduct?.name ?? t('no_item_selected')}
                 productSubtitle={selectedProductSubtitle}
               />

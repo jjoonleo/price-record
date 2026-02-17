@@ -3,6 +3,7 @@ export type Product = {
   name: string;
   normalizedName: string;
   note: string;
+  imageUri: string;
   createdAt: string;
 };
 
