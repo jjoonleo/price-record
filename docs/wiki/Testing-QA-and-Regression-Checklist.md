@@ -41,6 +41,11 @@ Protects:
 ### Capture autofill/date/validation changes
 - `SHOULD` add unit tests for utility behavior and edge cases.
 
+### Reusable component changes
+- `MUST` add or update `*.stories.tsx` for changed shared components.
+- `SHOULD` add `play` coverage for press/click interactions when callbacks are part of the contract.
+- `MUST` keep Storybook interaction tests passing (`npm run storybook:test`).
+
 ## Manual Regression Checklist
 ## Capture
 - [ ] Open Capture and verify initial defaults load.
@@ -82,7 +87,10 @@ Protects:
 ## Test Commands
 From project root:
 ```bash
+npx playwright install chromium # one-time setup for storybook:test
 npm test
+npm run storybook:web
+npm run storybook:test
 ```
 
 ## Related Pages

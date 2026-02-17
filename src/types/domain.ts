@@ -50,7 +50,7 @@ export type PlaceSelection = {
   latitude: number;
   longitude: number;
   cityArea: string;
-  addressLine: string;
+  addressLine?: string;
   suggestedStoreName?: string;
 };
 
