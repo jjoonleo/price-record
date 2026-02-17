@@ -7,9 +7,18 @@ type CompareHeaderProps = {
   backLabel: string;
   onBack: () => void;
   onAction: () => void;
+  actionLabel?: string;
+  actionAccessibilityLabel?: string;
 };
 
-export const CompareHeader = ({ title, backLabel, onBack, onAction }: CompareHeaderProps) => {
+export const CompareHeader = ({
+  title,
+  backLabel,
+  onBack,
+  onAction,
+  actionLabel,
+  actionAccessibilityLabel
+}: CompareHeaderProps) => {
   return (
     <View style={styles.header}>
       <View style={styles.headerRow}>
@@ -24,8 +33,10 @@ export const CompareHeader = ({ title, backLabel, onBack, onAction }: CompareHea
           accessibilityRole="button"
           onPress={onAction}
           style={({ pressed }) => [styles.headerAction, pressed && styles.pressed]}
+          accessibilityLabel={actionAccessibilityLabel}
+          accessibilityHint={actionLabel}
         >
-          <MaterialCommunityIcons color={colors.textSecondary} name="share-variant-outline" size={16} />
+          <MaterialCommunityIcons color={colors.textSecondary} name="pencil" size={16} />
         </Pressable>
       </View>
     </View>

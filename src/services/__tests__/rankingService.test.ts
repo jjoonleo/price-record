@@ -17,6 +17,7 @@ describe('buildStoreComparisons', () => {
   const rows: LatestStorePrice[] = [
     {
       storeId: 'a',
+      priceEntryId: 'entry-a',
       storeName: 'Store A',
       cityArea: 'Shibuya',
       addressLine: '1 Chome-1 Shibuya',
@@ -27,6 +28,7 @@ describe('buildStoreComparisons', () => {
     },
     {
       storeId: 'b',
+      priceEntryId: 'entry-b',
       storeName: 'Store B',
       cityArea: 'Shibuya',
       addressLine: '2 Chome-2 Shibuya',
@@ -37,6 +39,7 @@ describe('buildStoreComparisons', () => {
     },
     {
       storeId: 'c',
+      priceEntryId: 'entry-c',
       storeName: 'Store C',
       cityArea: 'Shibuya',
       addressLine: '3 Chome-3 Shibuya',

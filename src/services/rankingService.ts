@@ -67,6 +67,7 @@ export const buildStoreComparisons = (
 
     return {
       storeId: row.storeId,
+      priceEntryId: row.priceEntryId,
       storeName: row.storeName,
       cityArea: row.cityArea,
       addressLine: row.addressLine,

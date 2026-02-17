@@ -2,6 +2,7 @@ export type Product = {
   id: string;
   name: string;
   normalizedName: string;
+  note: string;
   createdAt: string;
 };
 
@@ -29,6 +30,7 @@ export type StoreComparisonTag = 'BEST' | 'CHEAPEST' | 'CLOSEST';
 
 export type StoreComparison = {
   storeId: string;
+  priceEntryId: string;
   storeName: string;
   cityArea: string;
   addressLine: string;

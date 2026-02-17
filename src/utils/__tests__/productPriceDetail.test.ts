@@ -11,6 +11,7 @@ describe('buildProductPriceDetailRouteParams', () => {
       {
         storeId: 'store-1',
         storeName: 'MEGA Don Quijote',
+        priceEntryId: 'entry-store-1',
         cityArea: 'Shibuya, Tokyo',
         addressLine: '28-6 Udagawacho, Shibuya City',
         latitude: 35.658,
@@ -27,6 +28,8 @@ describe('buildProductPriceDetailRouteParams', () => {
     expect(params).toEqual({
       productId: 'product-1',
       productName: 'Matcha KitKat',
+      priceEntryId: 'entry-store-1',
+      entryId: 'entry-store-1',
       storeId: 'store-1',
       storeName: 'MEGA Don Quijote',
       cityArea: 'Shibuya, Tokyo',
@@ -55,6 +58,7 @@ describe('parseProductPriceDetailRouteParams', () => {
       productName: 'Matcha KitKat',
       storeId: 's1',
       storeName: 'MEGA Don Quijote',
+      priceEntryId: 'entry-1',
       cityArea: 'Shibuya, Tokyo',
       addressLine: '28-6 Udagawacho, Shibuya City',
       latitude: '35.658',
@@ -68,8 +72,38 @@ describe('parseProductPriceDetailRouteParams', () => {
       productName: 'Matcha KitKat',
       storeId: 's1',
       storeName: 'MEGA Don Quijote',
+      priceEntryId: 'entry-1',
       cityArea: 'Shibuya, Tokyo',
       addressLine: '28-6 Udagawacho, Shibuya City',
+      latitude: 35.658,
+      longitude: 139.7016,
+      latestPriceYen: 398,
+      observedAt: '2026-02-12T09:00:00.000Z'
+    });
+  });
+
+  it('accepts legacy entryId as a fallback for priceEntryId', () => {
+    const parsed = parseProductPriceDetailRouteParams({
+      productId: 'p1',
+      productName: 'Matcha KitKat',
+      storeId: 's1',
+      storeName: 'MEGA Don Quijote',
+      entryId: 'legacy-entry-1',
+      cityArea: 'Shibuya, Tokyo',
+      latitude: '35.658',
+      longitude: '139.7016',
+      latestPriceYen: '398',
+      observedAt: '2026-02-12T09:00:00.000Z'
+    });
+
+    expect(parsed).toEqual({
+      productId: 'p1',
+      productName: 'Matcha KitKat',
+      storeId: 's1',
+      storeName: 'MEGA Don Quijote',
+      priceEntryId: 'legacy-entry-1',
+      cityArea: 'Shibuya, Tokyo',
+      addressLine: undefined,
       latitude: 35.658,
       longitude: 139.7016,
       latestPriceYen: 398,
@@ -83,6 +117,7 @@ describe('parseProductPriceDetailRouteParams', () => {
       productName: 'Matcha KitKat',
       storeId: 's1',
       storeName: 'MEGA Don Quijote',
+      priceEntryId: 'entry-1',
       cityArea: 'Shibuya, Tokyo',
       latitude: '35.658',
       longitude: '139.7016',
@@ -95,6 +130,7 @@ describe('parseProductPriceDetailRouteParams', () => {
       productName: 'Matcha KitKat',
       storeId: 's1',
       storeName: 'MEGA Don Quijote',
+      priceEntryId: 'entry-1',
       cityArea: 'Shibuya, Tokyo',
       addressLine: undefined,
       latitude: 35.658,

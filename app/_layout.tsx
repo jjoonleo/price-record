@@ -84,6 +84,7 @@ export default function RootLayout() {
       <Tabs.Screen name="history" options={{ title: t('tabs_history') }} />
       <Tabs.Screen name="profile" options={{ title: t('tabs_profile') }} />
       <Tabs.Screen name="product-price-detail" options={{ href: null }} />
+      <Tabs.Screen name="product-form" options={{ href: null }} />
     </Tabs>
   );
 }

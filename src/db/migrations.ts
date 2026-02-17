@@ -5,7 +5,7 @@ type UserVersionRow = {
   user_version: number;
 };
 
-const LATEST_DB_VERSION = 2;
+const LATEST_DB_VERSION = 3;
 
 const migrationV1 = `
 CREATE TABLE IF NOT EXISTS products (
@@ -47,6 +47,10 @@ const migrationV2 = `
 ALTER TABLE stores ADD COLUMN nickname TEXT;
 `;
 
+const migrationV3 = `
+ALTER TABLE products ADD COLUMN note TEXT NOT NULL DEFAULT '';
+`;
+
 export const runMigrations = async (): Promise<void> => {
   if (Platform.OS === 'web') {
     return;
@@ -65,6 +69,10 @@ export const runMigrations = async (): Promise<void> => {
 
   if (currentVersion < 2) {
     await execSqlBatch(migrationV2);
+  }
+
+  if (currentVersion < 3) {
+    await execSqlBatch(migrationV3);
   }
 
   await execSqlBatch(`PRAGMA user_version = ${LATEST_DB_VERSION};`);

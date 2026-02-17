@@ -5,10 +5,7 @@ export const DEFAULT_CAPTURE_COORDINATES = {
   longitude: 139.7671
 } as const;
 
-export const CAPTURE_NOTES_LIMIT = 140;
-
 type CaptureValidationMessages = {
-  productRequired: string;
   priceRequired: string;
   priceInvalidInteger: string;
   pricePositive: string;
@@ -18,7 +15,6 @@ type CaptureValidationMessages = {
   locationRequired: string;
   addressRequired: string;
   coordinatesInvalid: string;
-  notesTooLong: string;
 };
 
 const createCoordinateValidator = (min: number, max: number, invalidMessage: string) =>
@@ -36,7 +32,6 @@ const createCoordinateValidator = (min: number, max: number, invalidMessage: str
 export const createCaptureFormSchema = (messages: CaptureValidationMessages) =>
   z
     .object({
-      productName: z.string().trim().min(1, messages.productRequired),
       priceYen: z
         .string()
         .trim()
@@ -53,13 +48,13 @@ export const createCaptureFormSchema = (messages: CaptureValidationMessages) =>
         required_error: messages.dateRequired
       }),
       addressLine: z.string(),
-      notes: z.string().max(CAPTURE_NOTES_LIMIT, messages.notesTooLong),
       hasMapSelection: z.boolean().refine((value) => value, messages.locationRequired)
     })
     .superRefine((value, ctx) => {
       if (!value.hasMapSelection) {
         return;
       }
+
       if (value.addressLine.trim().length === 0) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
@@ -67,6 +62,7 @@ export const createCaptureFormSchema = (messages: CaptureValidationMessages) =>
           path: ['addressLine']
         });
       }
+
       if (value.systemStoreName.trim().length === 0) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
@@ -79,7 +75,6 @@ export const createCaptureFormSchema = (messages: CaptureValidationMessages) =>
 export type CaptureFormValues = z.infer<ReturnType<typeof createCaptureFormSchema>>;
 
 export const getCaptureFormDefaults = (): CaptureFormValues => ({
-  productName: '',
   priceYen: '',
   systemStoreName: '',
   storeNickname: '',
@@ -88,6 +83,5 @@ export const getCaptureFormDefaults = (): CaptureFormValues => ({
   longitude: DEFAULT_CAPTURE_COORDINATES.longitude.toString(),
   observedAt: new Date(),
   addressLine: '',
-  notes: '',
   hasMapSelection: false
 });
