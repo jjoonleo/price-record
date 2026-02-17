@@ -1,4 +1,5 @@
-import { Animated, Keyboard, Linking, Platform } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Animated, Keyboard, KeyboardEvent, Linking, Platform } from 'react-native';
 import { Details, MapPressEvent, Region } from 'react-native-maps';
 import { PlaceSuggestion } from '../../services/placesService';
 import { Coordinates } from '../../types/domain';
@@ -142,6 +143,27 @@ export const PlacePickerModalContentNative = ({
   onConfirm,
   resolvingLabel
 }: PlacePickerModalContentNativeProps) => {
+  const [androidKeyboardHeight, setAndroidKeyboardHeight] = useState(0);
+
+  useEffect(() => {
+    if (Platform.OS !== 'android') {
+      return;
+    }
+
+    const showSubscription = Keyboard.addListener('keyboardDidShow', (event: KeyboardEvent) => {
+      setAndroidKeyboardHeight(event.endCoordinates.height);
+    });
+
+    const hideSubscription = Keyboard.addListener('keyboardDidHide', () => {
+      setAndroidKeyboardHeight(0);
+    });
+
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, []);
+
   return (
     <PlacePickerModalShell visible={visible} edges={['left', 'right']}>
       {isInitializingLocation ? (
@@ -172,7 +194,7 @@ export const PlacePickerModalContentNative = ({
           onClear={onSearchClear}
           onFocus={onSearchFocus}
           onSubmitEditing={() => {
-            if (Platform.OS === 'ios') {
+            if (Platform.OS === 'ios' || Platform.OS === 'android') {
               Keyboard.dismiss();
             }
             onSearchSubmit();
@@ -210,6 +232,7 @@ export const PlacePickerModalContentNative = ({
       <PlacePickerInfoSheet
         bodyPaddingBottom={sheetBodyPaddingBottom}
         isVisible={isPlaceInfoVisible}
+        keyboardOverlapOffset={androidKeyboardHeight}
         onLayout={onSheetLayout}
         panHandlers={sheetPanHandlers}
         translateY={sheetTranslateY}

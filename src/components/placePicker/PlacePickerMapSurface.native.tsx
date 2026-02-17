@@ -88,7 +88,7 @@ export const PlacePickerMapSurface = ({
       {...(Platform.OS === 'ios' ? { followsUserLocation } : {})}
       {...(Platform.OS === 'android' ? { googleRenderer: 'LEGACY' as const } : {})}
     >
-      {currentLocationCoordinates ? (
+      {Platform.OS !== 'android' && currentLocationCoordinates ? (
         <Marker coordinate={currentLocationCoordinates} anchor={{ x: 0.5, y: 0.5 }}>
           <View style={styles.currentLocationDot} />
         </Marker>

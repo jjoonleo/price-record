@@ -9,6 +9,7 @@ type PlacePickerInfoSheetProps = {
   panHandlers?: object;
   zIndex?: number;
   bodyPaddingBottom?: number;
+  keyboardOverlapOffset?: number;
   children: ReactNode;
 };
 
@@ -19,13 +20,19 @@ export const PlacePickerInfoSheet = ({
   panHandlers,
   zIndex,
   bodyPaddingBottom,
+  keyboardOverlapOffset = 0,
   children
 }: PlacePickerInfoSheetProps) => {
   return (
     <Animated.View
       onLayout={onLayout}
       pointerEvents={isVisible ? 'auto' : 'none'}
-      style={[styles.sheet, zIndex ? { zIndex } : null, { transform: [{ translateY }] }]}
+      style={[
+        styles.sheet,
+        zIndex ? { zIndex } : null,
+        keyboardOverlapOffset > 0 ? { bottom: -keyboardOverlapOffset } : null,
+        { transform: [{ translateY }] }
+      ]}
       {...panHandlers}
     >
       <View style={styles.handleWrap}>
