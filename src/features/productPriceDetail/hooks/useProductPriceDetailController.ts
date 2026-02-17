@@ -1,4 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
+import { productPriceDetailScreenSelectors } from '../store/productPriceDetailScreenSelectors';
+import { useProductPriceDetailScreenStore } from '../store/productPriceDetailScreenStoreContext';
 import { Language } from '../../../i18n/translations';
 import { ProductPriceDetailRouteParams } from '../../../utils/productPriceDetail';
 import {
@@ -56,7 +58,12 @@ export const useProductPriceDetailController = ({
 }: ProductPriceDetailControllerInput) => {
   const locale = language === 'ko' ? 'ko-KR' : 'en-US';
   const parsedParams = useMemo(() => parseProductPriceDetailRouteParams(rawParams), [rawParams]);
-  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const statusMessage = useProductPriceDetailScreenStore(
+    productPriceDetailScreenSelectors.statusMessage
+  );
+  const setStatusMessage = useProductPriceDetailScreenStore(
+    productPriceDetailScreenSelectors.setStatusMessage
+  );
 
   const detailView = useMemo(() => {
     if (!parsedParams) {

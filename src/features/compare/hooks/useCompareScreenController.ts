@@ -1,11 +1,8 @@
 import { useFocusEffect } from '@react-navigation/native';
-import { useCallback, useMemo, useState } from 'react';
-import { getLatestStorePricesByProduct } from '../../../db/repositories/priceEntriesRepo';
-import { getProductById, listProductOptions } from '../../../db/repositories/productsRepo';
-import { captureCurrentLocation } from '../../../services/locationService';
-import { buildStoreComparisons } from '../../../services/rankingService';
+import { useCallback, useMemo } from 'react';
+import { shallow } from 'zustand/shallow';
 import { useFiltersStore } from '../../../state/useFiltersStore';
-import { Coordinates, ProductOption, StoreComparison } from '../../../types/domain';
+import { ProductOption, StoreComparison } from '../../../types/domain';
 import {
   PriceComparisonRow,
   RecommendationRow,
@@ -16,6 +13,8 @@ import {
 } from '../../../utils/compareScreen';
 import { openExternalRoute } from '../../../utils/externalMapNavigation';
 import { TranslationKey } from '../../../i18n/translations';
+import { compareScreenSelectors } from '../store/compareScreenSelectors';
+import { useCompareScreenStoreWithEquality } from '../store/compareScreenStoreContext';
 
 type Translate = (key: TranslationKey, params?: Record<string, string | number>) => string;
 
@@ -40,53 +39,39 @@ export type CompareScreenController = {
 export const useCompareScreenController = (t: Translate): CompareScreenController => {
   const { selectedProductId, setSelectedProductId, clearHistoryStoreFilter } = useFiltersStore();
 
-  const [products, setProducts] = useState<ProductOption[]>([]);
-  const [comparisons, setComparisons] = useState<StoreComparison[]>([]);
-  const [selectedProductImageUri, setSelectedProductImageUri] = useState('');
-  const [userLocation, setUserLocation] = useState<Coordinates | undefined>();
-  const [isLoading, setIsLoading] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [statusMessage, setStatusMessage] = useState<string | null>(null);
-
-  const refreshForProduct = useCallback(async (productId: string | null, location?: Coordinates) => {
-    if (!productId) {
-      setComparisons([]);
-      return;
-    }
-
-    const latestRows = await getLatestStorePricesByProduct(productId);
-    setComparisons(buildStoreComparisons(latestRows, location));
-  }, []);
+  const {
+    products,
+    comparisons,
+    selectedProductImageUri,
+    userLocation,
+    isLoading,
+    errorMessage,
+    statusMessage,
+    hydrateStore,
+    setStatusMessage
+  } = useCompareScreenStoreWithEquality(
+    (state) => ({
+      products: compareScreenSelectors.products(state),
+      comparisons: compareScreenSelectors.comparisons(state),
+      selectedProductImageUri: compareScreenSelectors.selectedProductImageUri(state),
+      userLocation: compareScreenSelectors.userLocation(state),
+      isLoading: compareScreenSelectors.isLoading(state),
+      errorMessage: compareScreenSelectors.errorMessage(state),
+      statusMessage: compareScreenSelectors.statusMessage(state),
+      hydrateStore: compareScreenSelectors.hydrateScreen(state),
+      setStatusMessage: compareScreenSelectors.setStatusMessage(state)
+    }),
+    shallow
+  );
 
   const hydrateScreen = useCallback(async () => {
-    setIsLoading(true);
-    setErrorMessage(null);
-
-    try {
-      const [productOptions, locationResult] = await Promise.all([listProductOptions(), captureCurrentLocation()]);
-      setProducts(productOptions);
-
-      const resolvedProductId = selectedProductId ?? productOptions[0]?.id ?? null;
-      if (resolvedProductId !== selectedProductId) {
-        setSelectedProductId(resolvedProductId);
-        clearHistoryStoreFilter();
-      }
-
-      const selectedProductDetails = resolvedProductId
-        ? await getProductById(resolvedProductId)
-        : null;
-      setSelectedProductImageUri(selectedProductDetails?.imageUri ?? '');
-
-      const resolvedLocation = locationResult.status === 'granted' ? locationResult.coordinates : undefined;
-      setUserLocation(resolvedLocation);
-
-      await refreshForProduct(resolvedProductId, resolvedLocation);
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : t('compare_load_error'));
-    } finally {
-      setIsLoading(false);
-    }
-  }, [clearHistoryStoreFilter, refreshForProduct, selectedProductId, setSelectedProductId, t]);
+    await hydrateStore({
+      selectedProductId,
+      setSelectedProductId,
+      clearHistoryStoreFilter,
+      compareLoadErrorMessage: t('compare_load_error')
+    });
+  }, [clearHistoryStoreFilter, hydrateStore, selectedProductId, setSelectedProductId, t]);
 
   useFocusEffect(
     useCallback(() => {
@@ -127,7 +112,7 @@ export const useCompareScreenController = (t: Translate): CompareScreenControlle
         setStatusMessage(t('navigation_open_failed'));
       }
     },
-    [t]
+    [setStatusMessage, t]
   );
 
   const applyFullHistoryFilter = useCallback(() => {
