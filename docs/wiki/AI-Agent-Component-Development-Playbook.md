@@ -71,6 +71,16 @@ Keep feature state and async orchestration in [store/controller files].
 7. Run typecheck and full tests before finalizing.
 8. Update wiki links so new developers can discover the blueprint and architecture rules quickly.
 
+## Storybook Workflow (Native + Web)
+- Add story files beside components as `*.stories.tsx` under `src/components/**`.
+- Reuse shared mock data from `src/storybook/fixtures/*` instead of duplicating fixture objects per story.
+- For native on-device rendering, run Storybook mode with:
+  - `EXPO_PUBLIC_STORYBOOK_ENABLED=true npm run start`
+  - or shortcut scripts `npm run storybook:native`, `npm run storybook:ios`, `npm run storybook:android`
+- For browser rendering, run `npm run storybook:web`.
+- Add `play` functions on interactive stories (buttons/chips/cards) so `npm run storybook:test` validates behavior.
+- Keep stories focused on reusable components first; add screen-level stories only when intentionally requested.
+
 ## Anti-Patterns to Avoid
 - Reintroducing API/service calls inside presentational UI components.
 - Adding cross-cutting styles in one mega stylesheet.

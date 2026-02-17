@@ -55,7 +55,7 @@ const resolveSystemStoreName = (selection: PlaceSelection, fallbackLabel: string
     return suggested;
   }
 
-  const firstAddressSegment = selection.addressLine.split(',')[0]?.trim();
+  const firstAddressSegment = selection.addressLine?.split(',')[0]?.trim();
   if (firstAddressSegment) {
     return firstAddressSegment;
   }
@@ -282,7 +282,7 @@ export default function CaptureScreen() {
         cityArea: selection.cityArea,
         latitude: selection.latitude,
         longitude: selection.longitude,
-        addressLine: selection.addressLine
+        addressLine: selection.addressLine ?? ''
       });
       setIsPlacePickerVisible(false);
     })();

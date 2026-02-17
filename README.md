@@ -35,6 +35,36 @@ React Native (Expo + TypeScript) app to record merchandise prices across Japanes
    ```
 3. Open on iOS/Android via Expo.
 
+## Storybook (Native + Web)
+
+Native Storybook uses an environment switch:
+
+- App mode (default): `npm run start`
+- Storybook mode: `EXPO_PUBLIC_STORYBOOK_ENABLED=true npm run start`
+
+Convenience commands:
+
+```bash
+npm run storybook:native
+npm run storybook:ios
+npm run storybook:android
+npm run storybook:web
+npm run storybook:build
+npm run storybook:test
+```
+
+Output paths:
+
+- Web Storybook static build: `storybook-static/`
+
+Notes:
+
+- Storybook setup is local-only in this phase (no hosted deployment flow configured).
+- Core stories live under `src/components/**/*.stories.tsx`.
+- Shared story fixtures live under `src/storybook/fixtures/`.
+- First-time interaction tests require Playwright browser install:
+  - `npx playwright install chromium`
+
 ## Webapp PWA Build
 
 Use the webapp build pipeline for installable/offline-ready web output:

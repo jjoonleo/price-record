@@ -1,7 +1,17 @@
 import renderer, { act } from 'react-test-renderer';
 import { CompareRecommendationsCard } from '../CompareRecommendationsCard';
 
+jest.mock('@expo/vector-icons', () => ({
+  MaterialCommunityIcons: 'MaterialCommunityIcons'
+}));
+
 describe('CompareRecommendationsCard', () => {
+  beforeAll(() => {
+    if (typeof window !== 'undefined' && typeof window.dispatchEvent !== 'function') {
+      (window as { dispatchEvent?: (event: Event) => boolean }).dispatchEvent = () => true;
+    }
+  });
+
   it('fires row selection callback with selected store id', () => {
     const onSelect = jest.fn();
     let tree!: renderer.ReactTestRenderer;
@@ -35,16 +45,22 @@ describe('CompareRecommendationsCard', () => {
       );
     });
 
-    const buttons = tree.root.findAll(
-      (node) => node.props.accessibilityRole === 'button' && typeof node.props.onPress === 'function'
-    );
-    expect(buttons).toHaveLength(2);
+    try {
+      const buttons = tree.root.findAll(
+        (node) => node.props.accessibilityRole === 'button' && typeof node.props.onPress === 'function'
+      );
+      expect(buttons).toHaveLength(2);
 
-    act(() => {
-      buttons[1].props.onPress();
-    });
+      act(() => {
+        buttons[1].props.onPress();
+      });
 
-    expect(onSelect).toHaveBeenCalledTimes(1);
-    expect(onSelect).toHaveBeenCalledWith('store-3');
+      expect(onSelect).toHaveBeenCalledTimes(1);
+      expect(onSelect).toHaveBeenCalledWith('store-3');
+    } finally {
+      act(() => {
+        tree.unmount();
+      });
+    }
   });
 });

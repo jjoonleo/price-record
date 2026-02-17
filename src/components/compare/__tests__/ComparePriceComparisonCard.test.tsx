@@ -35,18 +35,24 @@ describe('ComparePriceComparisonCard', () => {
       );
     });
 
-    const buttons = tree.root.findAll(
-      (node) => node.props.accessibilityRole === 'button' && typeof node.props.onPress === 'function'
-    );
-    expect(buttons).toHaveLength(1);
+    try {
+      const buttons = tree.root.findAll(
+        (node) => node.props.accessibilityRole === 'button' && typeof node.props.onPress === 'function'
+      );
+      expect(buttons).toHaveLength(1);
 
-    const textNodes = tree.root.findAllByType(Text);
-    expect(textNodes.length).toBeGreaterThan(0);
+      const textNodes = tree.root.findAllByType(Text);
+      expect(textNodes.length).toBeGreaterThan(0);
 
-    act(() => {
-      buttons[0].props.onPress();
-    });
+      act(() => {
+        buttons[0].props.onPress();
+      });
 
-    expect(onViewFullHistory).toHaveBeenCalledTimes(1);
+      expect(onViewFullHistory).toHaveBeenCalledTimes(1);
+    } finally {
+      act(() => {
+        tree.unmount();
+      });
+    }
   });
 });

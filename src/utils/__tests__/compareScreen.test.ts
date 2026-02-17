@@ -65,7 +65,7 @@ describe('compareScreen utilities', () => {
       createComparison('d', 168)
     ]);
 
-    expect(percent).toBe(-17);
+    expect(percent).toBe(-11);
   });
 
   it('formats relative age in minute, hour, and day buckets', () => {

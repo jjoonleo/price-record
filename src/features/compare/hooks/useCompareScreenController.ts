@@ -15,8 +15,9 @@ import {
   formatRelativeAge
 } from '../../../utils/compareScreen';
 import { openExternalRoute } from '../../../utils/externalMapNavigation';
+import { TranslationKey } from '../../../i18n/translations';
 
-type Translate = (key: string, params?: Record<string, string | number>) => string;
+type Translate = (key: TranslationKey, params?: Record<string, string | number>) => string;
 
 export type CompareScreenController = {
   selectedProduct: ProductOption | null;
