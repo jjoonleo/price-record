@@ -2,6 +2,7 @@ import { Platform, StyleSheet, View } from 'react-native';
 import MapView, { MapPressEvent, Marker, Region } from 'react-native-maps';
 import { colors } from '../../theme/tokens';
 import { Coordinates } from '../../types/domain';
+import { regionFromCoordinates } from './placePickerMapUtils';
 
 type PlacePickerMapSurfaceProps = {
   region: Region;
@@ -26,12 +27,29 @@ export const PlacePickerMapSurface = ({
   onRegionChangeComplete,
   onMarkerPress
 }: PlacePickerMapSurfaceProps) => {
+  const normalizedRegion = regionFromCoordinates(region);
+  const isValidCoordinate = (value: number): boolean => Number.isFinite(value);
+  const isValidRegion =
+    isValidCoordinate(normalizedRegion.latitude) &&
+    isValidCoordinate(normalizedRegion.longitude) &&
+    isValidCoordinate(normalizedRegion.latitudeDelta) &&
+    isValidCoordinate(normalizedRegion.longitudeDelta) &&
+    isValidCoordinate(coordinates.latitude) &&
+    isValidCoordinate(coordinates.longitude) &&
+    (!currentLocationCoordinates ||
+      (isValidCoordinate(currentLocationCoordinates.latitude) &&
+        isValidCoordinate(currentLocationCoordinates.longitude)));
+
+  if (!isValidRegion) {
+    return <View style={styles.map} />;
+  }
+
   return (
     <MapView
       onPress={onMapPress}
       onPanDrag={onPanDrag}
       onRegionChangeComplete={onRegionChangeComplete}
-      region={region}
+      region={normalizedRegion}
       showsUserLocation
       style={styles.map}
       {...(Platform.OS === 'ios' ? { followsUserLocation } : {})}

@@ -33,10 +33,12 @@
     },
     "android": {
       "package": "com.ejunpark.japanpricetracker",
-      "permissions": [
-        "ACCESS_COARSE_LOCATION",
-        "ACCESS_FINE_LOCATION"
-      ]
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyBLfI5pf9JRt1fYZffrM374SjSD5he_xOc"
+        }
+      },
+      "permissions": ["ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION"]
     }
   }
 }

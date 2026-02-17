@@ -108,6 +108,22 @@ Then start Expo normally:
 npx expo start --tunnel --clear
 ```
 
+For Android map rendering, add your Google Maps API key in `app.json`:
+
+```json
+{
+  "android": {
+    "config": {
+      "googleMaps": {
+        "apiKey": "your_google_maps_api_key"
+      }
+    }
+  }
+}
+```
+
+The same Google Cloud project can usually provide both API keys if Maps SDK and Places APIs are enabled.
+
 ## Test
 
 ```bash
