@@ -69,6 +69,7 @@ export const buildStoreComparisons = (
       storeId: row.storeId,
       storeName: row.storeName,
       cityArea: row.cityArea,
+      addressLine: row.addressLine,
       latitude: row.latitude,
       longitude: row.longitude,
       latestPriceYen: row.latestPriceYen,

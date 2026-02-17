@@ -9,6 +9,7 @@ type LatestStorePriceRow = {
   store_id: string;
   store_name: string;
   city_area: string;
+  address_line: string | null;
   latitude: number;
   longitude: number;
   price_yen: number;
@@ -31,6 +32,7 @@ export type LatestStorePrice = {
   storeId: string;
   storeName: string;
   cityArea: string;
+  addressLine: string;
   latitude: number;
   longitude: number;
   latestPriceYen: number;
@@ -187,6 +189,7 @@ export const getLatestStorePricesByProduct = async (
           storeId,
           storeName: resolveStoreName(store),
           cityArea: store.cityArea,
+          addressLine: store.addressLine,
           latitude: store.latitude,
           longitude: store.longitude,
           latestPriceYen: latest.priceYen,
@@ -213,6 +216,7 @@ export const getLatestStorePricesByProduct = async (
         pe.created_at,
         COALESCE(NULLIF(TRIM(s.nickname), ''), s.name) AS store_name,
         s.city_area,
+        s.address_line,
         s.latitude,
         s.longitude,
         ROW_NUMBER() OVER (
@@ -228,6 +232,7 @@ export const getLatestStorePricesByProduct = async (
       store_id,
       store_name,
       city_area,
+      address_line,
       latitude,
       longitude,
       price_yen,
@@ -242,6 +247,7 @@ export const getLatestStorePricesByProduct = async (
     storeId: row.store_id,
     storeName: row.store_name,
     cityArea: row.city_area,
+    addressLine: row.address_line ?? '',
     latitude: Number(row.latitude),
     longitude: Number(row.longitude),
     latestPriceYen: Number(row.price_yen),

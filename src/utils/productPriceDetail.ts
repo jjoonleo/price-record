@@ -7,6 +7,7 @@ export type ProductPriceDetailRouteParams = {
   storeId: string;
   storeName: string;
   cityArea: string;
+  addressLine?: string;
   latitude: string;
   longitude: string;
   latestPriceYen: string;
@@ -19,6 +20,7 @@ export type ParsedProductPriceDetailParams = {
   storeId: string;
   storeName: string;
   cityArea: string;
+  addressLine?: string;
   latitude: number;
   longitude: number;
   latestPriceYen: number;
@@ -51,6 +53,7 @@ export const buildProductPriceDetailRouteParams = (
   storeId: item.storeId,
   storeName: item.storeName,
   cityArea: item.cityArea,
+  addressLine: item.addressLine || undefined,
   latitude: String(item.latitude),
   longitude: String(item.longitude),
   latestPriceYen: String(item.latestPriceYen),
@@ -65,6 +68,7 @@ export const parseProductPriceDetailRouteParams = (
   const storeId = toParamString(params.storeId);
   const storeName = toParamString(params.storeName);
   const cityArea = toParamString(params.cityArea);
+  const addressLine = toParamString(params.addressLine) ?? undefined;
   const latitudeRaw = toParamString(params.latitude);
   const longitudeRaw = toParamString(params.longitude);
   const latestPriceRaw = toParamString(params.latestPriceYen);
@@ -105,6 +109,7 @@ export const parseProductPriceDetailRouteParams = (
     storeId,
     storeName,
     cityArea,
+    addressLine,
     latitude,
     longitude,
     latestPriceYen,
