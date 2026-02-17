@@ -80,7 +80,7 @@ export default function RootLayout() {
     >
       <Tabs.Screen name="index" options={{ title: t('tabs_home') }} />
       <Tabs.Screen name="capture" options={{ href: null }} />
-      <Tabs.Screen name="compare" options={{ title: t('tabs_compare') }} />
+      <Tabs.Screen name="compare" options={{ href: null }} />
       <Tabs.Screen name="history" options={{ title: t('tabs_history') }} />
       <Tabs.Screen name="profile" options={{ title: t('tabs_profile') }} />
       <Tabs.Screen name="product-price-detail" options={{ href: null }} />

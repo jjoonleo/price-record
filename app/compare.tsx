@@ -216,20 +216,26 @@ export default function CompareScreen() {
     [router, selectedProduct, t]
   );
 
+  const handleBack = useCallback(() => {
+    router.navigate('/');
+  }, [router]);
+
   return (
     <SafeAreaView edges={['top']} style={styles.screen}>
       <View style={styles.header}>
         <View style={[styles.headerRow, { width: frameWidth }]}> 
           <Pressable
             accessibilityRole="button"
-            onPress={() => router.navigate('/')}
+            onPress={handleBack}
             style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
           >
             <MaterialCommunityIcons color={colors.primary} name="chevron-left" size={19} />
             <Text style={styles.backText}>{t('back')}</Text>
           </Pressable>
 
-          <Text style={styles.headerTitle}>{t('compare_header_title')}</Text>
+          <View pointerEvents="none" style={styles.headerTitleWrap}>
+            <Text style={styles.headerTitle}>{t('compare_header_title')}</Text>
+          </View>
 
           <Pressable
             accessibilityRole="button"
@@ -238,6 +244,13 @@ export default function CompareScreen() {
           >
             <MaterialCommunityIcons color={colors.primary} name="qrcode-scan" size={18} />
           </Pressable>
+        </View>
+
+        <View style={[styles.compareItemRow, { width: frameWidth }]}>
+          <Text style={styles.compareItemLabel}>{t('compare_current_item')}:</Text>
+          <Text numberOfLines={1} style={styles.compareItemValue}>
+            {selectedProduct?.name ?? t('no_item_selected')}
+          </Text>
         </View>
       </View>
 
@@ -470,7 +483,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(242,242,247,0.92)',
     borderBottomColor: colors.borderSubtle,
     borderBottomWidth: 1,
-    paddingBottom: spacing.xs,
+    paddingBottom: spacing.sm,
     paddingTop: spacing.xs
   },
   headerRow: {
@@ -499,17 +512,43 @@ const styles = StyleSheet.create({
     fontFamily: typography.body,
     fontSize: typography.sizes.title,
     fontWeight: '700',
-    left: 0,
     lineHeight: 26,
-    position: 'absolute',
-    right: 0,
     textAlign: 'center'
+  },
+  headerTitleWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    left: 0,
+    position: 'absolute',
+    right: 0
   },
   headerAction: {
     alignItems: 'center',
     height: 35,
     justifyContent: 'center',
     width: 35
+  },
+  compareItemRow: {
+    alignItems: 'center',
+    alignSelf: 'center',
+    flexDirection: 'row',
+    gap: 6,
+    paddingHorizontal: spacing.md
+  },
+  compareItemLabel: {
+    color: colors.textSecondary,
+    fontFamily: typography.body,
+    fontSize: typography.sizes.micro,
+    fontWeight: '600',
+    lineHeight: 16
+  },
+  compareItemValue: {
+    color: colors.textPrimary,
+    flex: 1,
+    fontFamily: typography.body,
+    fontSize: typography.sizes.caption,
+    fontWeight: '600',
+    lineHeight: 18
   },
   scrollContent: {
     alignItems: 'center',
