@@ -1,6 +1,6 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { Pressable, StyleSheet, View } from 'react-native';
-import MapView, { Region } from 'react-native-maps';
+import { StyleSheet, View } from 'react-native';
+import MapView, { Marker, Region } from 'react-native-maps';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../../theme/tokens';
 
@@ -8,10 +8,6 @@ type ProductPriceMapHeroProps = {
   width: number;
   latitude: number;
   longitude: number;
-  isFavorite: boolean;
-  onBack: () => void;
-  onFavorite: () => void;
-  onShare: () => void;
 };
 
 const HERO_ASPECT_RATIO = 397.8 / 390;
@@ -19,11 +15,7 @@ const HERO_ASPECT_RATIO = 397.8 / 390;
 export const ProductPriceMapHero = ({
   width,
   latitude,
-  longitude,
-  isFavorite,
-  onBack,
-  onFavorite,
-  onShare
+  longitude
 }: ProductPriceMapHeroProps) => {
   const height = width * HERO_ASPECT_RATIO;
   const region: Region = {
@@ -42,9 +34,18 @@ export const ProductPriceMapHero = ({
         region={region}
         rotateEnabled={false}
         scrollEnabled={false}
-        style={StyleSheet.absoluteFill}
+        style={styles.map}
         zoomEnabled={false}
-      />
+      >
+        <Marker anchor={{ x: 0.5, y: 0.5 }} coordinate={{ latitude, longitude }}>
+          <View style={styles.markerWrap}>
+            <View style={styles.pinHalo} />
+            <View style={styles.pinCore}>
+              <MaterialCommunityIcons color={colors.white} name="shopping" size={14} />
+            </View>
+          </View>
+        </Marker>
+      </MapView>
 
       <LinearGradient
         colors={['rgba(0,0,0,0.4)', 'rgba(0,0,0,0)', 'rgba(0,0,0,0.1)']}
@@ -53,43 +54,6 @@ export const ProductPriceMapHero = ({
         style={StyleSheet.absoluteFill}
       />
 
-      <View pointerEvents="none" style={styles.mapPinWrap}>
-        <View style={styles.pinHalo} />
-        <View style={styles.pinCore}>
-          <MaterialCommunityIcons color={colors.white} name="shopping" size={14} />
-        </View>
-      </View>
-
-      <View style={styles.headerRow}>
-        <Pressable
-          accessibilityLabel="detail-back-button"
-          accessibilityRole="button"
-          onPress={onBack}
-          style={({ pressed }) => [styles.circleButton, pressed && styles.pressed]}
-        >
-          <MaterialCommunityIcons color={colors.primary} name="chevron-left" size={17} />
-        </Pressable>
-
-        <View style={styles.headerActions}>
-          <Pressable
-            accessibilityLabel="detail-favorite-button"
-            accessibilityRole="button"
-            onPress={onFavorite}
-            style={({ pressed }) => [styles.circleButton, pressed && styles.pressed]}
-          >
-            <MaterialCommunityIcons color={colors.primary} name={isFavorite ? 'heart' : 'heart-outline'} size={16} />
-          </Pressable>
-
-          <Pressable
-            accessibilityLabel="detail-share-button"
-            accessibilityRole="button"
-            onPress={onShare}
-            style={({ pressed }) => [styles.circleButton, pressed && styles.pressed]}
-          >
-            <MaterialCommunityIcons color={colors.primary} name="share-variant" size={16} />
-          </Pressable>
-        </View>
-      </View>
     </View>
   );
 };
@@ -100,39 +64,15 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     position: 'relative'
   },
-  headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    left: 0,
-    paddingHorizontal: 16,
-    paddingTop: 48,
-    position: 'absolute',
-    right: 0,
-    top: 0
+  map: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 0
   },
-  headerActions: {
-    flexDirection: 'row',
-    gap: 12
-  },
-  circleButton: {
+  markerWrap: {
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.9)',
-    borderRadius: 16,
-    height: 32,
+    height: 40,
     justifyContent: 'center',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 2,
-    width: 32
-  },
-  mapPinWrap: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    left: 0,
-    position: 'absolute',
-    right: 0,
-    top: '45%'
+    width: 40
   },
   pinHalo: {
     backgroundColor: 'rgba(0,122,255,0.3)',
@@ -150,8 +90,5 @@ const styles = StyleSheet.create({
     height: 40,
     justifyContent: 'center',
     width: 40
-  },
-  pressed: {
-    opacity: 0.82
   }
 });
