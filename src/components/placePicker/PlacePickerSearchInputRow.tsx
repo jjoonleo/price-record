@@ -1,5 +1,5 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { colors, radius, shadows, spacing, typography } from '../../theme/tokens';
 
 type PlacePickerSearchInputRowProps = {
@@ -29,12 +29,14 @@ export const PlacePickerSearchInputRow = ({
   onClear,
   clearAccessibilityLabel
 }: PlacePickerSearchInputRowProps) => {
+  const controlBackgroundColor = Platform.OS === 'android' ? '#E3E3E8' : 'rgba(227,227,232,0.8)';
+
   return (
     <View style={styles.row}>
-      <Pressable onPress={onBackPress} style={styles.backButton}>
+      <Pressable onPress={onBackPress} style={[styles.backButton, { backgroundColor: controlBackgroundColor }]}>
         <MaterialCommunityIcons color={colors.textPrimary} name="chevron-left" size={26} />
       </Pressable>
-      <View style={styles.inputShell}>
+      <View style={[styles.inputShell, { backgroundColor: controlBackgroundColor }]}>
         {!isFocused ? (
           <MaterialCommunityIcons color={colors.textSecondary} name="magnify" size={16} style={styles.searchIcon} />
         ) : null}
@@ -47,7 +49,8 @@ export const PlacePickerSearchInputRow = ({
           blurOnSubmit={false}
           placeholder={placeholder}
           placeholderTextColor={colors.textSecondary}
-          style={styles.input}
+          style={[styles.input, Platform.OS === 'android' ? styles.inputAndroid : null]}
+          {...(Platform.OS === 'android' ? { underlineColorAndroid: 'transparent' as const } : {})}
           value={value}
         />
         {value.trim().length > 0 ? (
@@ -91,11 +94,16 @@ const styles = StyleSheet.create({
     marginRight: spacing.xs
   },
   input: {
+    backgroundColor: 'transparent',
     color: colors.textPrimary,
     flex: 1,
     fontFamily: typography.body,
     fontSize: typography.sizes.title,
     lineHeight: 24
+  },
+  inputAndroid: {
+    includeFontPadding: false,
+    paddingVertical: 0
   },
   clearButton: {
     alignItems: 'center',
