@@ -1,5 +1,6 @@
 import { Image, ImageSourcePropType, StyleSheet, Text, View } from 'react-native';
 import { typography } from '../../theme/tokens';
+import { AppCard } from '../ui/AppCard';
 
 type ProductPriceEntryCardProps = {
   width: number;
@@ -19,7 +20,7 @@ export const ProductPriceEntryCard = ({
   imageSource
 }: ProductPriceEntryCardProps) => {
   return (
-    <View style={[styles.card, { width }]}>
+    <AppCard padded={false} style={[styles.card, { width }]}>
       <View style={styles.imageWrap}>
         <Image source={imageSource} style={styles.image} />
       </View>
@@ -43,14 +44,13 @@ export const ProductPriceEntryCard = ({
           {observedLabel}
         </Text>
       </View>
-    </View>
+    </AppCard>
   );
 };
 
 const styles = StyleSheet.create({
   card: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
     borderRadius: 32,
     flexDirection: 'row',
     padding: 16,

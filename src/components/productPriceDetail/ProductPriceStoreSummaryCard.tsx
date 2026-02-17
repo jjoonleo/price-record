@@ -1,6 +1,8 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { colors, typography } from '../../theme/tokens';
+import { StyleSheet, Text, View } from 'react-native';
+import { typography } from '../../theme/tokens';
+import { AppCard } from '../ui/AppCard';
+import { PrimaryButton } from '../ui/PrimaryButton';
 
 type ProductPriceStoreSummaryCardProps = {
   width: number;
@@ -24,7 +26,7 @@ export const ProductPriceStoreSummaryCard = ({
   onDirections
 }: ProductPriceStoreSummaryCardProps) => {
   return (
-    <View style={[styles.card, { width }]}>
+    <AppCard padded={false} style={[styles.card, { width }]}>
       <View style={styles.headerRow}>
         <View style={styles.titleBlock}>
           <Text numberOfLines={1} style={styles.title}>
@@ -56,17 +58,18 @@ export const ProductPriceStoreSummaryCard = ({
         </View>
       ) : null}
 
-      <Pressable accessibilityRole="button" onPress={onDirections} style={({ pressed }) => [styles.directionsButton, pressed && styles.pressed]}>
-        <MaterialCommunityIcons color={colors.white} name="navigation-variant" size={16} style={styles.directionsIcon} />
-        <Text style={styles.directionsLabel}>{directionsLabel}</Text>
-      </Pressable>
-    </View>
+      <PrimaryButton
+        label={directionsLabel}
+        onPress={onDirections}
+        style={styles.directionsButton}
+        textStyle={styles.directionsLabel}
+      />
+    </AppCard>
   );
 };
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#FFFFFF',
     borderRadius: 32,
     padding: 20,
     shadowColor: '#000000',
@@ -135,29 +138,11 @@ const styles = StyleSheet.create({
     marginLeft: 6
   },
   directionsButton: {
-    alignItems: 'center',
-    backgroundColor: '#007AFF',
     borderRadius: 24,
-    flexDirection: 'row',
-    height: 54,
-    justifyContent: 'center',
-    marginTop: 8,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2
-  },
-  directionsIcon: {
-    marginRight: 8
+    marginTop: 8
   },
   directionsLabel: {
-    color: '#FFFFFF',
-    fontFamily: typography.body,
-    fontSize: 17,
     fontWeight: '600',
-    lineHeight: 26
-  },
-  pressed: {
-    opacity: 0.9
+    lineHeight: 25.5
   }
 });

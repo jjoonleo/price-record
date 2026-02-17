@@ -1,6 +1,5 @@
-import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { Pressable, StyleSheet, View } from 'react-native';
-import { colors } from '../../theme/tokens';
+import { StyleSheet, View } from 'react-native';
+import { IconCircleButton } from '../ui/IconCircleButton';
 
 type ProductPriceMapHeaderActionsProps = {
   isFavorite: boolean;
@@ -17,33 +16,27 @@ export const ProductPriceMapHeaderActions = ({
 }: ProductPriceMapHeaderActionsProps) => {
   return (
     <View pointerEvents="box-none" style={styles.headerRow}>
-      <Pressable
+      <IconCircleButton
         accessibilityLabel="detail-back-button"
-        accessibilityRole="button"
+        iconName="chevron-left"
         onPress={onBack}
-        style={({ pressed }) => [styles.circleButton, pressed && styles.pressed]}
-      >
-        <MaterialCommunityIcons color={colors.primary} name="chevron-left" size={17} />
-      </Pressable>
+        size={17}
+      />
 
       <View style={styles.headerActions}>
-        <Pressable
+        <IconCircleButton
           accessibilityLabel="detail-favorite-button"
-          accessibilityRole="button"
+          iconName={isFavorite ? 'heart' : 'heart-outline'}
           onPress={onFavorite}
-          style={({ pressed }) => [styles.circleButton, pressed && styles.pressed]}
-        >
-          <MaterialCommunityIcons color={colors.primary} name={isFavorite ? 'heart' : 'heart-outline'} size={16} />
-        </Pressable>
+          size={16}
+        />
 
-        <Pressable
+        <IconCircleButton
           accessibilityLabel="detail-share-button"
-          accessibilityRole="button"
+          iconName="share-variant"
           onPress={onShare}
-          style={({ pressed }) => [styles.circleButton, pressed && styles.pressed]}
-        >
-          <MaterialCommunityIcons color={colors.primary} name="share-variant" size={16} />
-        </Pressable>
+          size={16}
+        />
       </View>
     </View>
   );
@@ -65,20 +58,5 @@ const styles = StyleSheet.create({
   headerActions: {
     flexDirection: 'row',
     gap: 12
-  },
-  circleButton: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.9)',
-    borderRadius: 16,
-    height: 32,
-    justifyContent: 'center',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 2,
-    width: 32
-  },
-  pressed: {
-    opacity: 0.82
   }
 });
