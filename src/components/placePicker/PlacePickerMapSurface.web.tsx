@@ -1,4 +1,5 @@
 import { CSSProperties, useEffect, useRef } from 'react';
+import { loadGoogleMapsApi } from '../../services/googleMapsWebLoader';
 import { Coordinates } from '../../types/domain';
 
 type PlacePickerMapSurfaceProps = {
@@ -15,6 +16,11 @@ type PlacePickerMapSurfaceProps = {
   recenterCoordinates: Coordinates | null;
 };
 
+const toLatLng = (coordinates: Coordinates) => ({
+  lat: coordinates.latitude,
+  lng: coordinates.longitude
+});
+
 export const PlacePickerMapSurface = ({
   visible,
   initialCoordinates,
@@ -30,12 +36,55 @@ export const PlacePickerMapSurface = ({
 }: PlacePickerMapSurfaceProps) => {
   const mapNodeRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<any | null>(null);
-  const markerRef = useRef<any | null>(null);
+  const selectedMarkerRef = useRef<any | null>(null);
   const currentLocationMarkerRef = useRef<any | null>(null);
-  const leafletRef = useRef<any | null>(null);
+  const mapsApiRef = useRef<any | null>(null);
   const mapTapStateRef = useRef({ isVisible: false, hasPlaceInfo: false });
   const onMapPressRef = useRef(onMapPress);
   const onMarkerPressRef = useRef(onMarkerPress);
+  const currentLocationCoordinatesRef = useRef<Coordinates | null>(currentLocationCoordinates);
+
+  currentLocationCoordinatesRef.current = currentLocationCoordinates;
+
+  const syncCurrentLocationMarker = () => {
+    const maps = mapsApiRef.current;
+    const map = mapRef.current;
+
+    if (!maps || !map) {
+      return;
+    }
+
+    const nextCoordinates = currentLocationCoordinatesRef.current;
+
+    if (!nextCoordinates) {
+      if (currentLocationMarkerRef.current) {
+        currentLocationMarkerRef.current.setMap(null);
+        currentLocationMarkerRef.current = null;
+      }
+      return;
+    }
+
+    const nextPosition = toLatLng(nextCoordinates);
+
+    if (currentLocationMarkerRef.current) {
+      currentLocationMarkerRef.current.setPosition(nextPosition);
+      return;
+    }
+
+    currentLocationMarkerRef.current = new maps.Marker({
+      map,
+      position: nextPosition,
+      clickable: false,
+      icon: {
+        path: maps.SymbolPath.CIRCLE,
+        fillColor: '#1D4ED8',
+        fillOpacity: 1,
+        scale: 6,
+        strokeColor: '#FFFFFF',
+        strokeWeight: 2
+      }
+    });
+  };
 
   useEffect(() => {
     onMapPressRef.current = onMapPress;
@@ -58,72 +107,51 @@ export const PlacePickerMapSurface = ({
 
     const initMap = async () => {
       try {
-        const module = await import('leaflet');
-        const L = module.default;
+        const maps = await loadGoogleMapsApi();
 
         if (disposed || !mapNodeRef.current) {
           return;
         }
 
-        leafletRef.current = L;
-
-        const map = L.map(mapNodeRef.current, {
-          zoomControl: false,
-          attributionControl: false
-        }).setView([initialCoordinates.latitude, initialCoordinates.longitude], 15);
-
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          maxZoom: 19,
-          attribution: '&copy; OpenStreetMap contributors'
-        }).addTo(map);
-
-        const marker = L.marker([initialCoordinates.latitude, initialCoordinates.longitude], {
-          draggable: false,
-          icon: L.divIcon({
-            className: 'place-picker-pin',
-            iconSize: [32, 32],
-            iconAnchor: [16, 32],
-            html:
-              '<div style="display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:999px;background:#FF3B30;box-shadow:0 8px 16px rgba(0,0,0,0.2)"><span style="width:10px;height:10px;border-radius:999px;background:#fff"></span></div>'
-          })
-        }).addTo(map);
-
-        marker.setOpacity(hasPlaceInfo ? 1 : 0);
-
-        map.on('click', () => {
-          onMapPressRef.current();
+        const center = toLatLng(initialCoordinates);
+        const map = new maps.Map(mapNodeRef.current, {
+          center,
+          zoom: 15,
+          mapTypeId: 'roadmap',
+          mapTypeControl: false,
+          streetViewControl: false,
+          fullscreenControl: false
         });
 
-        marker.on('click', (event: any) => {
-          L.DomEvent.stopPropagation(event);
+        const selectedMarker = new maps.Marker({
+          map,
+          position: center,
+          visible: hasPlaceInfo
+        });
+
+        selectedMarker.addListener('click', () => {
           if (!mapTapStateRef.current.hasPlaceInfo) {
             return;
           }
+
           onMarkerPressRef.current();
         });
 
-        mapRef.current = map;
-        markerRef.current = marker;
-
-        if (currentLocationCoordinates) {
-          currentLocationMarkerRef.current = L.circleMarker(
-            [currentLocationCoordinates.latitude, currentLocationCoordinates.longitude],
-            {
-              radius: 6,
-              color: '#1D4ED8',
-              weight: 2,
-              fillColor: '#1D4ED8',
-              fillOpacity: 1
-            }
-          ).addTo(map);
-        }
-
-        window.requestAnimationFrame(() => {
-          map.invalidateSize();
+        map.addListener('click', () => {
+          onMapPressRef.current();
         });
+
+        mapRef.current = map;
+        selectedMarkerRef.current = selectedMarker;
+        mapsApiRef.current = maps;
+        syncCurrentLocationMarker();
 
         onMapError(null);
       } catch (error) {
+        if (disposed) {
+          return;
+        }
+
         onMapError(error instanceof Error ? error.message : 'Map failed to load');
       }
     };
@@ -132,12 +160,26 @@ export const PlacePickerMapSurface = ({
 
     return () => {
       disposed = true;
-      markerRef.current = null;
-      currentLocationMarkerRef.current = null;
 
-      if (mapRef.current) {
-        mapRef.current.remove();
-        mapRef.current = null;
+      if (currentLocationMarkerRef.current) {
+        currentLocationMarkerRef.current.setMap(null);
+        currentLocationMarkerRef.current = null;
+      }
+
+      if (selectedMarkerRef.current) {
+        selectedMarkerRef.current.setMap(null);
+        selectedMarkerRef.current = null;
+      }
+
+      if (mapRef.current && mapsApiRef.current?.event) {
+        mapsApiRef.current.event.clearInstanceListeners(mapRef.current);
+      }
+
+      mapRef.current = null;
+      mapsApiRef.current = null;
+
+      if (mapNodeRef.current) {
+        mapNodeRef.current.innerHTML = '';
       }
     };
   }, [initialCoordinates.latitude, initialCoordinates.longitude, onMapError, visible]);
@@ -148,17 +190,16 @@ export const PlacePickerMapSurface = ({
     }
 
     const map = mapRef.current;
-    const marker = markerRef.current;
+    const marker = selectedMarkerRef.current;
 
     if (!map || !marker) {
       return;
     }
 
-    marker.setLatLng([coordinates.latitude, coordinates.longitude]);
-    marker.setOpacity(hasPlaceInfo ? 1 : 0);
-
-    map.invalidateSize();
-    map.setView([coordinates.latitude, coordinates.longitude], map.getZoom() ?? 15, { animate: false });
+    const nextPosition = toLatLng(coordinates);
+    marker.setPosition(nextPosition);
+    marker.setVisible(hasPlaceInfo);
+    map.setCenter(nextPosition);
   }, [coordinates, hasPlaceInfo, visible]);
 
   useEffect(() => {
@@ -166,31 +207,7 @@ export const PlacePickerMapSurface = ({
       return;
     }
 
-    const map = mapRef.current;
-    const L = leafletRef.current;
-
-    if (!map || !L || !currentLocationCoordinates) {
-      return;
-    }
-
-    if (currentLocationMarkerRef.current) {
-      currentLocationMarkerRef.current.setLatLng([
-        currentLocationCoordinates.latitude,
-        currentLocationCoordinates.longitude
-      ]);
-      return;
-    }
-
-    currentLocationMarkerRef.current = L.circleMarker(
-      [currentLocationCoordinates.latitude, currentLocationCoordinates.longitude],
-      {
-        radius: 6,
-        color: '#1D4ED8',
-        weight: 2,
-        fillColor: '#1D4ED8',
-        fillOpacity: 1
-      }
-    ).addTo(map);
+    syncCurrentLocationMarker();
   }, [currentLocationCoordinates, visible]);
 
   useEffect(() => {
@@ -203,9 +220,7 @@ export const PlacePickerMapSurface = ({
       return;
     }
 
-    map.setView([recenterCoordinates.latitude, recenterCoordinates.longitude], map.getZoom() ?? 15, {
-      animate: true
-    });
+    map.panTo(toLatLng(recenterCoordinates));
   }, [recenterCoordinates, recenterRequestId, visible]);
 
   return <div ref={mapNodeRef} style={mapStyle} />;

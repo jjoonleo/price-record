@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react';
-import 'leaflet/dist/leaflet.css';
 import { PlacePickerModalContentWeb } from './placePicker/PlacePickerModalContent.web';
 import { usePlacePickerSheetController } from './placePicker/hooks/usePlacePickerSheetController';
 import { usePlacePickerController } from '../features/placePicker/hooks/usePlacePickerController';

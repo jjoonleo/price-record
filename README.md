@@ -93,13 +93,14 @@ Expected runtime behavior:
 - First-ever load requires network.
 - Repeat visits (and installed app shell) work offline after initial successful load.
 
-## Google Place Search Setup
+## Google Maps + Place Search Setup
 
 Map selection works without a key (pin-only mode).  
 To enable place search/autocomplete, create `.env` in project root:
 
 ```bash
 EXPO_PUBLIC_GOOGLE_PLACES_API_KEY=your_key_here
+EXPO_PUBLIC_GOOGLE_MAPS_WEB_API_KEY=your_web_maps_js_key_here
 ```
 
 Then start Expo normally:
@@ -127,6 +128,13 @@ Production blank-map checklist:
 - Use Android app restrictions with package `com.ejunpark.japanpricetracker`.
 - Add the correct SHA-1 fingerprints (release cert for prod, debug cert for local).
 - Keep Places key and Maps key separate if restrictions differ.
+
+Web Google Maps checklist:
+
+- Enable `Maps JavaScript API` for the web key.
+- Use `Websites` (HTTP referrer) restrictions for that web key.
+- Include all local/dev origins you use (for example `http://localhost:*`).
+- Include your production domain(s), for example Netlify app domain.
 
 ## Test
 

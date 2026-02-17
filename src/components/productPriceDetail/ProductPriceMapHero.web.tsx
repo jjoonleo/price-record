@@ -2,7 +2,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { CSSProperties, useEffect, useRef } from 'react';
 import { StyleSheet, View } from 'react-native';
-import 'leaflet/dist/leaflet.css';
+import { loadGoogleMapsApi } from '../../services/googleMapsWebLoader';
 import { colors } from '../../theme/tokens';
 import { ProductPriceMapHeaderActions } from './ProductPriceMapHeaderActions';
 
@@ -18,6 +18,8 @@ type ProductPriceMapHeroProps = {
 
 const HERO_ASPECT_RATIO = 397.8 / 390;
 
+const toLatLng = (latitude: number, longitude: number) => ({ lat: latitude, lng: longitude });
+
 export const ProductPriceMapHero = ({
   width,
   latitude,
@@ -30,6 +32,7 @@ export const ProductPriceMapHero = ({
   const height = width * HERO_ASPECT_RATIO;
   const mapNodeRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<any | null>(null);
+  const mapsApiRef = useRef<any | null>(null);
 
   useEffect(() => {
     if (!mapNodeRef.current || typeof window === 'undefined') {
@@ -39,40 +42,45 @@ export const ProductPriceMapHero = ({
     let disposed = false;
 
     const initMap = async () => {
-      const module = await import('leaflet');
-      const L = module.default;
+      try {
+        const maps = await loadGoogleMapsApi();
+        if (disposed || !mapNodeRef.current) {
+          return;
+        }
 
-      if (disposed || !mapNodeRef.current) {
-        return;
+        const map = new maps.Map(mapNodeRef.current, {
+          center: toLatLng(latitude, longitude),
+          zoom: 15,
+          mapTypeId: 'roadmap',
+          disableDefaultUI: true,
+          gestureHandling: 'none',
+          keyboardShortcuts: false,
+          draggable: false,
+          scrollwheel: false,
+          disableDoubleClickZoom: true
+        });
+
+        mapRef.current = map;
+        mapsApiRef.current = maps;
+      } catch {
+        // Keep static background/overlay when map script fails.
       }
-
-      const map = L.map(mapNodeRef.current, {
-        zoomControl: false,
-        attributionControl: false,
-        dragging: false,
-        scrollWheelZoom: false,
-        doubleClickZoom: false,
-        touchZoom: false,
-        boxZoom: false,
-        keyboard: false
-      }).setView([latitude, longitude], 15);
-
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19,
-        attribution: '&copy; OpenStreetMap contributors'
-      }).addTo(map);
-
-      mapRef.current = map;
-      window.requestAnimationFrame(() => map.invalidateSize());
     };
 
     void initMap();
 
     return () => {
       disposed = true;
-      if (mapRef.current) {
-        mapRef.current.remove();
-        mapRef.current = null;
+
+      if (mapRef.current && mapsApiRef.current?.event) {
+        mapsApiRef.current.event.clearInstanceListeners(mapRef.current);
+      }
+
+      mapRef.current = null;
+      mapsApiRef.current = null;
+
+      if (mapNodeRef.current) {
+        mapNodeRef.current.innerHTML = '';
       }
     };
   }, [latitude, longitude]);
@@ -82,7 +90,7 @@ export const ProductPriceMapHero = ({
       return;
     }
 
-    mapRef.current.setView([latitude, longitude], mapRef.current.getZoom() ?? 15, { animate: false });
+    mapRef.current.setCenter(toLatLng(latitude, longitude));
   }, [latitude, longitude]);
 
   return (
@@ -111,7 +119,6 @@ export const ProductPriceMapHero = ({
           onShare={onShare}
         />
       </View>
-
     </View>
   );
 };
@@ -157,6 +164,6 @@ const styles = StyleSheet.create({
 const mapStyle: CSSProperties = {
   height: '100%',
   position: 'relative',
-  zIndex: 0,
-  width: '100%'
+  width: '100%',
+  zIndex: 0
 };

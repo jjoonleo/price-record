@@ -1,6 +1,6 @@
 import { CSSProperties, useEffect, useRef, useState } from 'react';
-import 'leaflet/dist/leaflet.css';
 import { StyleSheet, Text, View } from 'react-native';
+import { loadGoogleMapsApi } from '../services/googleMapsWebLoader';
 import { useI18n } from '../i18n/useI18n';
 import { colors, spacing, typography } from '../theme/tokens';
 
@@ -11,11 +11,14 @@ type EntryLocationMapProps = {
   cityArea: string;
 };
 
+const toLatLng = (latitude: number, longitude: number) => ({ lat: latitude, lng: longitude });
+
 export const EntryLocationMap = ({ latitude, longitude, storeName, cityArea }: EntryLocationMapProps) => {
   const { t } = useI18n();
   const mapNodeRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<any | null>(null);
   const markerRef = useRef<any | null>(null);
+  const mapsApiRef = useRef<any | null>(null);
   const [mapError, setMapError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -27,39 +30,44 @@ export const EntryLocationMap = ({ latitude, longitude, storeName, cityArea }: E
 
     const initMap = async () => {
       try {
-        const module = await import('leaflet');
-        const L = module.default;
+        const maps = await loadGoogleMapsApi();
 
         if (disposed || !mapNodeRef.current) {
           return;
         }
 
-        const map = L.map(mapNodeRef.current, {
-          zoomControl: false,
-          attributionControl: false
-        }).setView([latitude, longitude], 15);
+        const center = toLatLng(latitude, longitude);
+        const map = new maps.Map(mapNodeRef.current, {
+          center,
+          zoom: 15,
+          mapTypeId: 'roadmap',
+          mapTypeControl: false,
+          streetViewControl: false,
+          fullscreenControl: false
+        });
 
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          maxZoom: 19,
-          attribution: '&copy; OpenStreetMap contributors'
-        }).addTo(map);
-
-        const marker = L.marker([latitude, longitude], {
-          icon: L.divIcon({
-            className: 'entry-location-pin',
-            iconSize: [32, 32],
-            iconAnchor: [16, 16],
-            html:
-              '<div style="display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:999px;background:#137FEC;border:2px solid #fff;box-shadow:0 4px 10px rgba(0,0,0,0.2)"><span style="width:8px;height:8px;border-radius:999px;background:#fff"></span></div>'
-          })
-        }).addTo(map);
+        const marker = new maps.Marker({
+          map,
+          position: center,
+          icon: {
+            path: maps.SymbolPath.CIRCLE,
+            fillColor: '#137FEC',
+            fillOpacity: 1,
+            scale: 8,
+            strokeColor: '#FFFFFF',
+            strokeWeight: 2
+          }
+        });
 
         mapRef.current = map;
         markerRef.current = marker;
-        window.requestAnimationFrame(() => {
-          map.invalidateSize();
-        });
+        mapsApiRef.current = maps;
+        setMapError(null);
       } catch (error) {
+        if (disposed) {
+          return;
+        }
+
         setMapError(error instanceof Error ? error.message : 'Map failed to load');
       }
     };
@@ -68,21 +76,36 @@ export const EntryLocationMap = ({ latitude, longitude, storeName, cityArea }: E
 
     return () => {
       disposed = true;
-      markerRef.current = null;
-      if (mapRef.current) {
-        mapRef.current.remove();
-        mapRef.current = null;
+
+      if (markerRef.current) {
+        markerRef.current.setMap(null);
+        markerRef.current = null;
+      }
+
+      if (mapRef.current && mapsApiRef.current?.event) {
+        mapsApiRef.current.event.clearInstanceListeners(mapRef.current);
+      }
+
+      mapRef.current = null;
+      mapsApiRef.current = null;
+
+      if (mapNodeRef.current) {
+        mapNodeRef.current.innerHTML = '';
       }
     };
   }, []);
 
   useEffect(() => {
-    if (!mapRef.current || !markerRef.current) {
+    const map = mapRef.current;
+    const marker = markerRef.current;
+
+    if (!map || !marker) {
       return;
     }
 
-    markerRef.current.setLatLng([latitude, longitude]);
-    mapRef.current.setView([latitude, longitude], mapRef.current.getZoom() ?? 15, { animate: false });
+    const nextCenter = toLatLng(latitude, longitude);
+    marker.setPosition(nextCenter);
+    map.setCenter(nextCenter);
   }, [latitude, longitude]);
 
   return (

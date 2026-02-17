@@ -45,6 +45,14 @@ const buildServiceWorker = async () => {
     navigateFallback: '/index.html',
     runtimeCaching: [
       {
+        urlPattern: /^https:\/\/maps\.googleapis\.com\/.*/i,
+        handler: 'NetworkOnly'
+      },
+      {
+        urlPattern: /^https:\/\/maps\.gstatic\.com\/.*/i,
+        handler: 'NetworkOnly'
+      },
+      {
         urlPattern: /^https:\/\/places\.googleapis\.com\/.*/i,
         handler: 'NetworkOnly'
       },

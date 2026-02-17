@@ -32,6 +32,7 @@ npm test
 Environment variable for Places search:
 ```bash
 EXPO_PUBLIC_GOOGLE_PLACES_API_KEY=your_key_here
+EXPO_PUBLIC_GOOGLE_MAPS_WEB_API_KEY=your_web_maps_js_key_here
 ```
 
 Behavior without key:
@@ -81,6 +82,15 @@ Checks:
 - Verify `EXPO_PUBLIC_GOOGLE_PLACES_API_KEY` is configured and non-empty.
 - Validate API key restrictions/billing if request denied.
 - Handle quota limits by continuing with pin/manual path.
+
+## Web maps unavailable
+Symptoms:
+- Web map surface shows loading failure/fallback state.
+
+Checks:
+- Verify `EXPO_PUBLIC_GOOGLE_MAPS_WEB_API_KEY` is configured and non-empty.
+- Confirm `Maps JavaScript API` is enabled for that key.
+- Confirm website referrer restrictions include local/dev and production origins.
 
 ## History missing expected entries
 Symptoms:

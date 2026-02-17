@@ -71,7 +71,7 @@ Behavior:
 - Search suggestions can update marker via place details.
 
 ### Web (`PlacePickerModal.web.tsx`, `StoreMap.web.tsx`)
-- Full-screen modal with interactive Leaflet map in place picker.
+- Full-screen modal with interactive Google Maps JavaScript API map in place picker.
 - Selected-place marker and current-location marker are managed via map refs.
 - Current location action can re-center map and keep search/pin-only fallback behavior.
 - `StoreMap.web.tsx` remains a non-interactive list fallback for compare screen.
@@ -79,13 +79,16 @@ Behavior:
 ## Environment and Key Setup
 Environment variable:
 - `EXPO_PUBLIC_GOOGLE_PLACES_API_KEY`
+- `EXPO_PUBLIC_GOOGLE_MAPS_WEB_API_KEY`
 
 Resolution:
-- `src/config/env.ts` trims and exposes key.
+- `src/config/env.ts` trims and exposes keys.
 - `hasGooglePlacesApiKey()` gates search-enabled mode.
+- `hasGoogleMapsWebApiKey()` gates web map script loading.
 
 Without key:
-- App still functions using pin/manual location path.
+- Missing Places key: app still functions using pin/manual location path.
+- Missing web Maps key: web map surfaces fail gracefully and do not crash the app.
 
 ## Failure Mode Matrix
 | Failure | System Behavior | User Path |
