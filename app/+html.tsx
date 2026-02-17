@@ -32,8 +32,9 @@ export default function Root({ children }: RootProps) {
         <meta content="IE=edge" httpEquiv="X-UA-Compatible" />
         <meta content="width=device-width, initial-scale=1, shrink-to-fit=no" name="viewport" />
         <meta content="#12243B" name="theme-color" />
-        <link href="/manifest.json" rel="manifest" />
+        <link href="/icons/icon-512.png" rel="icon" type="image/png" />
         <link href="/icons/apple-touch-icon.png" rel="apple-touch-icon" />
+        <link href="/manifest.json" rel="manifest" />
         <ScrollViewStyleReset />
         <style dangerouslySetInnerHTML={{ __html: backgroundStyle }} />
       </head>
