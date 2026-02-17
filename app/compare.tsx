@@ -26,6 +26,7 @@ import { buildStoreComparisons } from '../src/services/rankingService';
 import { useFiltersStore } from '../src/state/useFiltersStore';
 import { colors, spacing, typography } from '../src/theme/tokens';
 import { Coordinates, HistoryEntry, ProductOption, StoreComparison } from '../src/types/domain';
+import { openExternalRoute } from '../src/utils/externalMapNavigation';
 import { compactStoreLabel, formatYen } from '../src/utils/formatters';
 import { buildProductPriceDetailRouteParams } from '../src/utils/productPriceDetail';
 
@@ -235,6 +236,22 @@ export default function CompareScreen() {
     [router, selectedProduct, t]
   );
 
+  const handleNavigateFromCompare = useCallback(
+    async (item: StoreComparison) => {
+      const didOpen = await openExternalRoute({
+        latitude: item.latitude,
+        longitude: item.longitude,
+        label: item.storeName,
+        mode: 'transit'
+      });
+
+      if (!didOpen) {
+        setStatusMessage(t('navigation_open_failed'));
+      }
+    },
+    [t]
+  );
+
   return (
     <SafeAreaView edges={['top']} style={styles.screen}>
       <View style={styles.header}>
@@ -335,7 +352,9 @@ export default function CompareScreen() {
                 <View style={styles.bestActionsRow}>
                   <PrimaryButton
                     label={t('compare_navigate')}
-                    onPress={() => goToDetail(topChoice)}
+                    onPress={() => {
+                      void handleNavigateFromCompare(topChoice);
+                    }}
                     style={styles.navigateButton}
                     textStyle={styles.navigateButtonText}
                   />

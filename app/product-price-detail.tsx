@@ -13,6 +13,7 @@ import {
 } from '../src/components/productPriceDetail';
 import { useI18n } from '../src/i18n/useI18n';
 import { spacing } from '../src/theme/tokens';
+import { openExternalRoute } from '../src/utils/externalMapNavigation';
 import { ProductPriceDetailRouteParams } from '../src/utils/productPriceDetail';
 import { useProductPriceDetailController } from '../src/features/productPriceDetail/hooks/useProductPriceDetailController';
 
@@ -33,6 +34,24 @@ export default function ProductPriceDetailScreen() {
 
   const handleBack = () => {
     router.navigate('/compare');
+  };
+
+  const handleNavigate = async () => {
+    if (!parsedParams) {
+      setStatusMessage(t('navigation_open_failed'));
+      return;
+    }
+
+    const didOpen = await openExternalRoute({
+      latitude: parsedParams.latitude,
+      longitude: parsedParams.longitude,
+      label: parsedParams.storeName,
+      mode: 'transit'
+    });
+
+    if (!didOpen) {
+      setStatusMessage(t('navigation_open_failed'));
+    }
   };
 
   return (
@@ -80,7 +99,9 @@ export default function ProductPriceDetailScreen() {
               latitude={parsedParams.latitude}
               longitude={parsedParams.longitude}
               navigateLabel={t('detail_navigate')}
-              onNavigate={() => setStatusMessage(t('detail_navigate_pending'))}
+              onNavigate={() => {
+                void handleNavigate();
+              }}
               storeName={parsedParams.storeName}
               width={contentWidth}
             />
