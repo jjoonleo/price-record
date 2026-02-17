@@ -41,6 +41,16 @@ const createInitialState = (): Omit<
   | 'setMapError'
   | 'markHydrationAttempted'
   | 'buildConfirmSelection'
+  | 'showPlaceInfoSheet'
+  | 'hidePlaceInfoSheet'
+  | 'resetOverlayVisibility'
+  | 'focusSearch'
+  | 'blurSearch'
+  | 'submitSearch'
+  | 'clearSearchOverlay'
+  | 'hideSearchUi'
+  | 'armSuggestionInteractionGuard'
+  | 'shouldIgnoreMapTap'
 > => ({
   apiStatus: { mode: 'pin-only', reason: 'missing-key' },
   searchQuery: '',
@@ -60,7 +70,12 @@ const createInitialState = (): Omit<
   locationStatusMessage: null,
   mapError: null,
   initialSelectionQuery: '',
-  didHydrateFromInitialSelection: false
+  didHydrateFromInitialSelection: false,
+  isPlaceInfoVisible: false,
+  isSearchFocused: false,
+  keepSuggestionPanelVisible: false,
+  suppressNextSearchBlur: false,
+  suppressMapTapUntilMs: 0
 });
 
 export const createPlacePickerStore = (
@@ -97,7 +112,12 @@ export const createPlacePickerStore = (
         locationStatusMessage: null,
         mapError: null,
         initialSelectionQuery,
-        didHydrateFromInitialSelection: false
+        didHydrateFromInitialSelection: false,
+        isPlaceInfoVisible: input.showPlaceInfoInitially,
+        isSearchFocused: false,
+        keepSuggestionPanelVisible: false,
+        suppressNextSearchBlur: false,
+        suppressMapTapUntilMs: 0
       });
 
       try {
@@ -291,7 +311,11 @@ export const createPlacePickerStore = (
         set({
           cityArea: resolvedCityArea,
           addressLine: resolvedAddressLine,
-          searchQuery: suggestion.primaryText
+          searchQuery: suggestion.primaryText,
+          isPlaceInfoVisible: true,
+          isSearchFocused: false,
+          keepSuggestionPanelVisible: false,
+          suppressNextSearchBlur: false
         });
       } catch {
         if (runId !== selectRunId) {
@@ -301,7 +325,11 @@ export const createPlacePickerStore = (
         set({
           suggestedStoreName: suggestion.primaryText,
           websiteUri: undefined,
-          searchQuery: suggestion.primaryText
+          searchQuery: suggestion.primaryText,
+          isPlaceInfoVisible: true,
+          isSearchFocused: false,
+          keepSuggestionPanelVisible: false,
+          suppressNextSearchBlur: false
         });
       } finally {
         if (runId === selectRunId) {
@@ -360,6 +388,78 @@ export const createPlacePickerStore = (
         addressLine: state.addressLine,
         suggestedStoreName: state.suggestedStoreName
       };
+    },
+
+    showPlaceInfoSheet: () => {
+      set({ isPlaceInfoVisible: true });
+    },
+
+    hidePlaceInfoSheet: () => {
+      set({ isPlaceInfoVisible: false });
+    },
+
+    resetOverlayVisibility: (showPlaceInfoInitially) => {
+      set({
+        isPlaceInfoVisible: showPlaceInfoInitially,
+        isSearchFocused: false,
+        keepSuggestionPanelVisible: false,
+        suppressNextSearchBlur: false,
+        suppressMapTapUntilMs: 0
+      });
+    },
+
+    focusSearch: () => {
+      const state = get();
+      if (state.apiStatus.mode !== 'search-enabled') {
+        return;
+      }
+
+      set({
+        isSearchFocused: true,
+        keepSuggestionPanelVisible: false
+      });
+    },
+
+    blurSearch: () => {
+      const state = get();
+      if (state.suppressNextSearchBlur) {
+        set({ suppressNextSearchBlur: false });
+        return;
+      }
+
+      set({ isSearchFocused: false });
+    },
+
+    submitSearch: () => {
+      const state = get();
+      if (state.apiStatus.mode !== 'search-enabled') {
+        return;
+      }
+
+      set({ keepSuggestionPanelVisible: true });
+    },
+
+    clearSearchOverlay: () => {
+      set({ keepSuggestionPanelVisible: false });
+    },
+
+    hideSearchUi: () => {
+      set({
+        isSearchFocused: false,
+        keepSuggestionPanelVisible: false,
+        suppressNextSearchBlur: false
+      });
+    },
+
+    armSuggestionInteractionGuard: (nowMs, durationMs = 350) => {
+      set({
+        suppressNextSearchBlur: true,
+        suppressMapTapUntilMs: nowMs + durationMs
+      });
+    },
+
+    shouldIgnoreMapTap: (nowMs) => {
+      return nowMs < get().suppressMapTapUntilMs;
     }
   }));
 };

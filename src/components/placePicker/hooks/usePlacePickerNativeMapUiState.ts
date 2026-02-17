@@ -18,6 +18,7 @@ type UsePlacePickerNativeMapUiStateParams = {
   hidePlaceInfoSheet: () => void;
   showPlaceInfoSheet: () => void;
   hideSearchUi: () => void;
+  shouldIgnoreMapTap: (nowMs: number) => boolean;
   handleUseCurrentLocation: () => Promise<UseCurrentLocationResult>;
 };
 
@@ -30,10 +31,28 @@ export const usePlacePickerNativeMapUiState = ({
   hidePlaceInfoSheet,
   showPlaceInfoSheet,
   hideSearchUi,
+  shouldIgnoreMapTap,
   handleUseCurrentLocation
 }: UsePlacePickerNativeMapUiStateParams) => {
   const [mapRegion, setMapRegion] = useState<Region>(regionFromCoordinates(initialCoordinates));
   const [followsUserLocation, setFollowsUserLocation] = useState(false);
+  const [nativeUserLocationCoordinates, setNativeUserLocationCoordinates] = useState<Coordinates | null>(null);
+
+  const buildRegionPreservingZoom = useCallback((nextCoordinates: Coordinates, previousRegion: Region): Region => {
+    const fallbackRegion = regionFromCoordinates(nextCoordinates);
+    return {
+      latitude: nextCoordinates.latitude,
+      longitude: nextCoordinates.longitude,
+      latitudeDelta:
+        Number.isFinite(previousRegion.latitudeDelta) && previousRegion.latitudeDelta > 0
+          ? previousRegion.latitudeDelta
+          : fallbackRegion.latitudeDelta,
+      longitudeDelta:
+        Number.isFinite(previousRegion.longitudeDelta) && previousRegion.longitudeDelta > 0
+          ? previousRegion.longitudeDelta
+          : fallbackRegion.longitudeDelta
+    };
+  }, []);
 
   useEffect(() => {
     if (!visible) {
@@ -50,12 +69,17 @@ export const usePlacePickerNativeMapUiState = ({
   const resetMapUiForSession = useCallback(
     (nextInitialCoordinates: Coordinates) => {
       setMapRegion(regionFromCoordinates(nextInitialCoordinates));
+      setNativeUserLocationCoordinates(null);
       clearTrackingMode();
     },
     [clearTrackingMode]
   );
 
   const handleMapPress = useCallback((_event: MapPressEvent) => {
+    if (shouldIgnoreMapTap(Date.now())) {
+      return;
+    }
+
     if (isPlaceInfoVisible) {
       hidePlaceInfoSheet();
     }
@@ -63,7 +87,7 @@ export const usePlacePickerNativeMapUiState = ({
     hideSearchUi();
     clearTrackingMode();
     Keyboard.dismiss();
-  }, [clearTrackingMode, hidePlaceInfoSheet, hideSearchUi, isPlaceInfoVisible]);
+  }, [clearTrackingMode, hidePlaceInfoSheet, hideSearchUi, isPlaceInfoVisible, shouldIgnoreMapTap]);
 
   const handleMarkerPress = useCallback(() => {
     if (!hasPlaceInfo) {
@@ -76,6 +100,12 @@ export const usePlacePickerNativeMapUiState = ({
   }, [hasPlaceInfo, hideSearchUi, showPlaceInfoSheet]);
 
   const handleUseCurrentLocationPress = useCallback(async () => {
+    if (nativeUserLocationCoordinates) {
+      setFollowsUserLocation(true);
+      setMapRegion((previousRegion) => buildRegionPreservingZoom(nativeUserLocationCoordinates, previousRegion));
+      return;
+    }
+
     const { currentLocationCoordinates: nextCoordinates, locationStatusMessage: nextLocationError } =
       await handleUseCurrentLocation();
 
@@ -84,13 +114,27 @@ export const usePlacePickerNativeMapUiState = ({
     }
 
     setFollowsUserLocation(true);
-    setMapRegion(regionFromCoordinates(nextCoordinates));
-  }, [handleUseCurrentLocation]);
+    setMapRegion((previousRegion) => buildRegionPreservingZoom(nextCoordinates, previousRegion));
+  }, [buildRegionPreservingZoom, handleUseCurrentLocation, nativeUserLocationCoordinates]);
 
   const handleRecenter = useCallback(() => {
     clearTrackingMode();
-    setMapRegion(regionFromCoordinates(coordinates));
-  }, [clearTrackingMode, coordinates]);
+    setMapRegion((previousRegion) => buildRegionPreservingZoom(coordinates, previousRegion));
+  }, [buildRegionPreservingZoom, clearTrackingMode, coordinates]);
+
+  const handleUserLocationChange = useCallback((nextCoordinates: Coordinates) => {
+    setNativeUserLocationCoordinates((previousCoordinates) => {
+      if (
+        previousCoordinates &&
+        Math.abs(previousCoordinates.latitude - nextCoordinates.latitude) < 0.000001 &&
+        Math.abs(previousCoordinates.longitude - nextCoordinates.longitude) < 0.000001
+      ) {
+        return previousCoordinates;
+      }
+
+      return nextCoordinates;
+    });
+  }, []);
 
   const handleRegionChangeComplete = useCallback((nextRegion: Region, details?: Details) => {
     if (Platform.OS === 'android' && details?.isGesture === false) {
@@ -132,6 +176,7 @@ export const usePlacePickerNativeMapUiState = ({
     handleMarkerPress,
     handleRecenter,
     handleRegionChangeComplete,
+    handleUserLocationChange,
     handleUseCurrentLocationPress,
     mapRegion,
     resetMapUiForSession,

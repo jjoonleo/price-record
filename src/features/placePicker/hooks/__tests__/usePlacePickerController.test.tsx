@@ -260,4 +260,49 @@ describe('usePlacePickerController', () => {
 
     harness.unmount();
   });
+
+  it('exposes overlay ui actions and interaction guards', async () => {
+    const harness = renderController(
+      {
+        visible: true,
+        initialCoordinates: TOKYO_STATION
+      },
+      createDependencies()
+    );
+
+    await flushPromises();
+
+    act(() => {
+      harness.getValue().focusSearch();
+      harness.getValue().submitSearch();
+    });
+
+    expect(harness.getValue().isSearchFocused).toBe(true);
+    expect(harness.getValue().isSuggestionPanelRequested).toBe(true);
+
+    act(() => {
+      harness.getValue().armSuggestionInteractionGuard(1_000, 350);
+      harness.getValue().blurSearch();
+    });
+
+    expect(harness.getValue().isSearchFocused).toBe(true);
+    expect(harness.getValue().shouldIgnoreMapTap(1_300)).toBe(true);
+    expect(harness.getValue().shouldIgnoreMapTap(1_351)).toBe(false);
+
+    act(() => {
+      harness.getValue().showPlaceInfoSheet();
+    });
+    expect(harness.getValue().isPlaceInfoVisible).toBe(true);
+
+    act(() => {
+      harness.getValue().hidePlaceInfoSheet();
+      harness.getValue().hideSearchUi();
+    });
+
+    expect(harness.getValue().isPlaceInfoVisible).toBe(false);
+    expect(harness.getValue().isSearchFocused).toBe(false);
+    expect(harness.getValue().isSuggestionPanelRequested).toBe(false);
+
+    harness.unmount();
+  });
 });

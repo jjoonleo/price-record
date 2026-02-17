@@ -197,4 +197,117 @@ describe('createPlacePickerStore', () => {
       suggestedStoreName: undefined
     });
   });
+
+  it('resets overlay visibility from initialize session flags', async () => {
+    const store = createPlacePickerStore(createDependencies());
+
+    await store.getState().initializeSession({
+      initialCoordinates: TOKYO_STATION,
+      showPlaceInfoInitially: true
+    });
+
+    expect(store.getState().isPlaceInfoVisible).toBe(true);
+    expect(store.getState().isSearchFocused).toBe(false);
+    expect(store.getState().keepSuggestionPanelVisible).toBe(false);
+
+    store.getState().focusSearch();
+    store.getState().submitSearch();
+
+    await store.getState().initializeSession({
+      initialCoordinates: TOKYO_STATION,
+      showPlaceInfoInitially: false
+    });
+
+    expect(store.getState().isPlaceInfoVisible).toBe(false);
+    expect(store.getState().isSearchFocused).toBe(false);
+    expect(store.getState().keepSuggestionPanelVisible).toBe(false);
+  });
+
+  it('reopens place info on selecting the same suggestion repeatedly', async () => {
+    const store = createPlacePickerStore(createDependencies());
+
+    await store.getState().initializeSession({
+      initialCoordinates: TOKYO_STATION,
+      showPlaceInfoInitially: false
+    });
+
+    const sameSuggestion = {
+      placeId: 'place-1',
+      primaryText: 'Shibuya Store'
+    };
+
+    await store.getState().selectSuggestion(sameSuggestion);
+    expect(store.getState().isPlaceInfoVisible).toBe(true);
+
+    store.getState().hidePlaceInfoSheet();
+    expect(store.getState().isPlaceInfoVisible).toBe(false);
+
+    await store.getState().selectSuggestion(sameSuggestion);
+    expect(store.getState().isPlaceInfoVisible).toBe(true);
+  });
+
+  it('handles map tap suppression guard windows', () => {
+    const store = createPlacePickerStore(createDependencies());
+
+    store.getState().armSuggestionInteractionGuard(1_000, 350);
+
+    expect(store.getState().shouldIgnoreMapTap(1_300)).toBe(true);
+    expect(store.getState().shouldIgnoreMapTap(1_351)).toBe(false);
+  });
+
+  it('handles search ui focus/blur/submit/clear/hide transitions', async () => {
+    const store = createPlacePickerStore(createDependencies());
+
+    await store.getState().initializeSession({
+      initialCoordinates: TOKYO_STATION,
+      showPlaceInfoInitially: false
+    });
+
+    store.getState().focusSearch();
+    expect(store.getState().isSearchFocused).toBe(true);
+    expect(store.getState().keepSuggestionPanelVisible).toBe(false);
+
+    store.getState().submitSearch();
+    expect(store.getState().keepSuggestionPanelVisible).toBe(true);
+
+    store.getState().clearSearchOverlay();
+    expect(store.getState().keepSuggestionPanelVisible).toBe(false);
+
+    store.getState().armSuggestionInteractionGuard(1_000);
+    store.getState().blurSearch();
+    expect(store.getState().isSearchFocused).toBe(true);
+    expect(store.getState().suppressNextSearchBlur).toBe(false);
+
+    store.getState().blurSearch();
+    expect(store.getState().isSearchFocused).toBe(false);
+
+    store.getState().focusSearch();
+    store.getState().submitSearch();
+    store.getState().hideSearchUi();
+    expect(store.getState().isSearchFocused).toBe(false);
+    expect(store.getState().keepSuggestionPanelVisible).toBe(false);
+    expect(store.getState().suppressNextSearchBlur).toBe(false);
+  });
+
+  it('forces suggestion panel request false when api mode is pin-only', async () => {
+    const store = createPlacePickerStore(
+      createDependencies({
+        getInitialPlacesApiStatus: () => ({ mode: 'pin-only', reason: 'missing-key' })
+      })
+    );
+
+    await store.getState().initializeSession({
+      initialCoordinates: TOKYO_STATION,
+      showPlaceInfoInitially: false
+    });
+
+    store.getState().focusSearch();
+    store.getState().submitSearch();
+
+    const state = store.getState();
+    const isSuggestionPanelRequested =
+      state.apiStatus.mode === 'search-enabled' && (state.isSearchFocused || state.keepSuggestionPanelVisible);
+
+    expect(isSuggestionPanelRequested).toBe(false);
+  });
 });

@@ -28,6 +28,7 @@ const meta = {
     onMapPress: fn(),
     onMarkerPress: fn(),
     onMapPanDrag: fn(),
+    onUserLocationChange: fn(),
     onRegionChangeComplete: fn(),
     mapRegion: placePickerRegionFixture,
     followsUserLocation: false,

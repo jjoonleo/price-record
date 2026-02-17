@@ -34,6 +34,7 @@ type PlacePickerModalContentNativeProps = {
   onMapPress: (event: MapPressEvent) => void;
   onMarkerPress: () => void;
   onMapPanDrag: () => void;
+  onUserLocationChange: (coordinates: Coordinates) => void;
   onRegionChangeComplete: (region: Region, details?: Details) => void;
   mapRegion: Region;
   followsUserLocation: boolean;
@@ -93,6 +94,7 @@ export const PlacePickerModalContentNative = ({
   onMapPress,
   onMarkerPress,
   onMapPanDrag,
+  onUserLocationChange,
   onRegionChangeComplete,
   mapRegion,
   followsUserLocation,
@@ -152,6 +154,7 @@ export const PlacePickerModalContentNative = ({
           onMapPress={onMapPress}
           onMarkerPress={onMarkerPress}
           onPanDrag={onMapPanDrag}
+          onUserLocationChange={onUserLocationChange}
           onRegionChangeComplete={onRegionChangeComplete}
           region={mapRegion}
           followsUserLocation={followsUserLocation}

@@ -55,6 +55,10 @@ export const usePlacePickerController = ({
     mapError,
     initialSelectionQuery,
     didHydrateFromInitialSelection,
+    isPlaceInfoVisible,
+    isSearchFocused,
+    keepSuggestionPanelVisible,
+    isSuggestionPanelRequested,
     initializeSession,
     setSearchQuery,
     clearSearchQuery,
@@ -63,7 +67,17 @@ export const usePlacePickerController = ({
     useCurrentLocation,
     setMapError,
     markHydrationAttempted,
-    buildConfirmSelection
+    buildConfirmSelection,
+    showPlaceInfoSheet,
+    hidePlaceInfoSheet,
+    resetOverlayVisibility,
+    focusSearch,
+    blurSearch,
+    submitSearch,
+    clearSearchOverlay,
+    hideSearchUi,
+    armSuggestionInteractionGuard,
+    shouldIgnoreMapTap
   } = usePlacePickerStoreWithEquality(
     (state) => ({
       apiStatus: placePickerSelectors.apiStatus(state),
@@ -85,6 +99,10 @@ export const usePlacePickerController = ({
       mapError: placePickerSelectors.mapError(state),
       initialSelectionQuery: placePickerSelectors.initialSelectionQuery(state),
       didHydrateFromInitialSelection: placePickerSelectors.didHydrateFromInitialSelection(state),
+      isPlaceInfoVisible: placePickerSelectors.isPlaceInfoVisible(state),
+      isSearchFocused: placePickerSelectors.isSearchFocused(state),
+      keepSuggestionPanelVisible: placePickerSelectors.keepSuggestionPanelVisible(state),
+      isSuggestionPanelRequested: placePickerSelectors.isSuggestionPanelRequested(state),
       initializeSession: placePickerSelectors.initializeSession(state),
       setSearchQuery: placePickerSelectors.setSearchQuery(state),
       clearSearchQuery: placePickerSelectors.clearSearchQuery(state),
@@ -93,7 +111,17 @@ export const usePlacePickerController = ({
       useCurrentLocation: placePickerSelectors.useCurrentLocation(state),
       setMapError: placePickerSelectors.setMapError(state),
       markHydrationAttempted: placePickerSelectors.markHydrationAttempted(state),
-      buildConfirmSelection: placePickerSelectors.buildConfirmSelection(state)
+      buildConfirmSelection: placePickerSelectors.buildConfirmSelection(state),
+      showPlaceInfoSheet: placePickerSelectors.showPlaceInfoSheet(state),
+      hidePlaceInfoSheet: placePickerSelectors.hidePlaceInfoSheet(state),
+      resetOverlayVisibility: placePickerSelectors.resetOverlayVisibility(state),
+      focusSearch: placePickerSelectors.focusSearch(state),
+      blurSearch: placePickerSelectors.blurSearch(state),
+      submitSearch: placePickerSelectors.submitSearch(state),
+      clearSearchOverlay: placePickerSelectors.clearSearchOverlay(state),
+      hideSearchUi: placePickerSelectors.hideSearchUi(state),
+      armSuggestionInteractionGuard: placePickerSelectors.armSuggestionInteractionGuard(state),
+      shouldIgnoreMapTap: placePickerSelectors.shouldIgnoreMapTap(state)
     }),
     shallow
   );
@@ -101,6 +129,7 @@ export const usePlacePickerController = ({
   useEffect(() => {
     if (!visible) {
       hasOpenedRef.current = false;
+      resetOverlayVisibility(false);
       return;
     }
 
@@ -114,13 +143,7 @@ export const usePlacePickerController = ({
       initialPlaceSelection,
       showPlaceInfoInitially
     });
-  }, [
-    initializeSession,
-    initialCoordinates,
-    initialPlaceSelection,
-    showPlaceInfoInitially,
-    visible
-  ]);
+  }, [initializeSession, initialCoordinates, initialPlaceSelection, resetOverlayVisibility, showPlaceInfoInitially, visible]);
 
   useEffect(() => {
     if (!visible) {
@@ -139,9 +162,10 @@ export const usePlacePickerController = ({
   const handleSuggestionSelect = useCallback(
     async (suggestion: (typeof suggestions)[number]) => {
       await selectSuggestion(suggestion);
+      showPlaceInfoSheet();
       onSuggestionApplied?.();
     },
-    [onSuggestionApplied, selectSuggestion]
+    [onSuggestionApplied, selectSuggestion, showPlaceInfoSheet]
   );
 
   useEffect(() => {
@@ -211,11 +235,25 @@ export const usePlacePickerController = ({
     isResolvingAddress,
     locationStatusMessage,
     mapError,
+    isPlaceInfoVisible,
+    isSearchFocused,
+    keepSuggestionPanelVisible,
+    isSuggestionPanelRequested,
     setSearchQuery,
     clearSearchQuery,
     handleSuggestionSelect,
     handleUseCurrentLocation,
     handleConfirmSelection,
-    setMapError
+    setMapError,
+    showPlaceInfoSheet,
+    hidePlaceInfoSheet,
+    resetOverlayVisibility,
+    focusSearch,
+    blurSearch,
+    submitSearch,
+    clearSearchOverlay,
+    hideSearchUi,
+    armSuggestionInteractionGuard,
+    shouldIgnoreMapTap
   };
 };

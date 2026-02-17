@@ -19,6 +19,10 @@ export type LocationCaptureResult =
       message: string;
     };
 
+type CaptureCurrentLocationOptions = {
+  resolveAddress?: boolean;
+};
+
 const pickCityArea = (place: Location.LocationGeocodedAddress): string => {
   return (
     place.district ||
@@ -94,7 +98,18 @@ const reverseGeocodeFallback = async (
   };
 };
 
-const buildGrantedResult = async (coordinates: Coordinates): Promise<LocationCaptureResult> => {
+const buildGrantedResult = async (
+  coordinates: Coordinates,
+  resolveAddress: boolean
+): Promise<LocationCaptureResult> => {
+  if (!resolveAddress) {
+    return {
+      status: 'granted',
+      coordinates,
+      cityArea: 'Unknown area'
+    };
+  }
+
   try {
     const reverse = await reverseGeocodeToArea(coordinates);
     return {
@@ -112,7 +127,9 @@ const buildGrantedResult = async (coordinates: Coordinates): Promise<LocationCap
   }
 };
 
-const tryBrowserGeolocation = async (): Promise<LocationCaptureResult | null> => {
+const tryBrowserGeolocation = async (
+  resolveAddress: boolean
+): Promise<LocationCaptureResult | null> => {
   if (typeof navigator === 'undefined' || !navigator.geolocation) {
     return null;
   }
@@ -133,7 +150,14 @@ const tryBrowserGeolocation = async (): Promise<LocationCaptureResult | null> =>
     );
   });
 
-  return buildGrantedResult(coordinates);
+  return buildGrantedResult(coordinates, resolveAddress);
+};
+
+const toCoordinates = (position: Location.LocationObject): Coordinates => {
+  return {
+    latitude: position.coords.latitude,
+    longitude: position.coords.longitude
+  };
 };
 
 export const reverseGeocodeToArea = async (
@@ -164,13 +188,22 @@ export const reverseGeocodeToArea = async (
   };
 };
 
-export const captureCurrentLocation = async (): Promise<LocationCaptureResult> => {
+export const captureCurrentLocation = async (
+  options: CaptureCurrentLocationOptions = {}
+): Promise<LocationCaptureResult> => {
   const isKorean = detectLanguage() === 'ko';
+  const resolveAddress = options.resolveAddress ?? false;
+
   try {
-    const permission = await Location.requestForegroundPermissionsAsync();
+    const existingPermission = await Location.getForegroundPermissionsAsync();
+    const permission =
+      existingPermission.status === 'granted'
+        ? existingPermission
+        : await Location.requestForegroundPermissionsAsync();
+
     if (permission.status !== 'granted') {
       try {
-        const browserFallback = await tryBrowserGeolocation();
+        const browserFallback = await tryBrowserGeolocation(resolveAddress);
         if (browserFallback) {
           return browserFallback;
         }
@@ -186,18 +219,28 @@ export const captureCurrentLocation = async (): Promise<LocationCaptureResult> =
       };
     }
 
-    const current = await Location.getCurrentPositionAsync({
-      accuracy: Location.Accuracy.Balanced
+    const lastKnown = await Location.getLastKnownPositionAsync({
+      maxAge: 60_000,
+      requiredAccuracy: 500
     });
 
-    const coordinates = {
-      latitude: current.coords.latitude,
-      longitude: current.coords.longitude
-    };
-    return buildGrantedResult(coordinates);
+    if (lastKnown) {
+      return buildGrantedResult(toCoordinates(lastKnown), resolveAddress);
+    }
+
+    const current = await Promise.race([
+      Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced
+      }),
+      new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('Timed out while fetching current location.')), 10_000);
+      })
+    ]);
+
+    return buildGrantedResult(toCoordinates(current), resolveAddress);
   } catch (error) {
     try {
-      const browserFallback = await tryBrowserGeolocation();
+      const browserFallback = await tryBrowserGeolocation(resolveAddress);
       if (browserFallback) {
         return browserFallback;
       }

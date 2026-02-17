@@ -1,7 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import 'leaflet/dist/leaflet.css';
 import { PlacePickerModalContentWeb } from './placePicker/PlacePickerModalContent.web';
-import { usePlacePickerSearchUiState } from './placePicker/hooks/usePlacePickerSearchUiState';
 import { usePlacePickerSheetController } from './placePicker/hooks/usePlacePickerSheetController';
 import { usePlacePickerController } from '../features/placePicker/hooks/usePlacePickerController';
 import {
@@ -31,36 +30,8 @@ const PlacePickerModalBody = ({
 }: PlacePickerModalProps) => {
   const { t } = useI18n();
   const notSelectedLabel = t('not_selected');
-  const hasOpenedRef = useRef(false);
-  const suppressMapTapUntilRef = useRef(0);
   const [recenterRequestId, setRecenterRequestId] = useState(0);
   const [recenterCoordinates, setRecenterCoordinates] = useState<Coordinates | null>(null);
-
-  const {
-    handleSearchBlur,
-    handleSearchClear,
-    handleSearchFocus,
-    handleSearchSubmit,
-    handleSuggestionPressIn,
-    hideSearchUi,
-    isSearchFocused,
-    keepSuggestionPanelVisible,
-    resetSearchUiForSession
-  } = usePlacePickerSearchUiState();
-
-  const {
-    controlsTranslateY,
-    handleSheetLayout,
-    hidePlaceInfoSheet,
-    isPlaceInfoVisible,
-    resetSheetForSession,
-    sheetPanHandlers,
-    sheetTranslateY,
-    showPlaceInfoSheet
-  } = usePlacePickerSheetController({
-    initialHiddenOffset: 420,
-    useNativeDriver: false
-  });
 
   const {
     apiStatus,
@@ -80,12 +51,24 @@ const PlacePickerModalBody = ({
     isResolvingAddress,
     locationStatusMessage,
     mapError,
+    isPlaceInfoVisible,
+    isSearchFocused,
+    isSuggestionPanelRequested,
     setSearchQuery,
     clearSearchQuery,
     handleSuggestionSelect,
     handleUseCurrentLocation,
     handleConfirmSelection,
-    setMapError
+    setMapError,
+    showPlaceInfoSheet,
+    hidePlaceInfoSheet,
+    focusSearch,
+    blurSearch,
+    submitSearch,
+    clearSearchOverlay,
+    hideSearchUi,
+    armSuggestionInteractionGuard,
+    shouldIgnoreMapTap
   } = usePlacePickerController({
     visible,
     initialCoordinates,
@@ -93,8 +76,20 @@ const PlacePickerModalBody = ({
     showPlaceInfoInitially,
     notSelectedLabel,
     onClose,
-    onConfirm,
-    onSuggestionApplied: showPlaceInfoSheet
+    onConfirm
+  });
+
+  const {
+    controlsTranslateY,
+    handleSheetLayout,
+    sheetPanHandlers,
+    sheetTranslateY
+  } = usePlacePickerSheetController({
+    initialHiddenOffset: 420,
+    useNativeDriver: false,
+    isPlaceInfoVisible,
+    showPlaceInfoSheet,
+    hidePlaceInfoSheet
   });
 
   const cityAreaLabel = cityArea ?? notSelectedLabel;
@@ -107,23 +102,8 @@ const PlacePickerModalBody = ({
   );
   const fallbackMessage = useMemo(() => buildFallbackMessage(apiStatus, (key) => t(key)), [apiStatus, t]);
 
-  useEffect(() => {
-    if (!visible) {
-      hasOpenedRef.current = false;
-      return;
-    }
-
-    if (hasOpenedRef.current) {
-      return;
-    }
-
-    hasOpenedRef.current = true;
-    resetSearchUiForSession();
-    resetSheetForSession(showPlaceInfoInitially);
-  }, [resetSearchUiForSession, resetSheetForSession, showPlaceInfoInitially, visible]);
-
   const handleMapPress = () => {
-    if (Date.now() < suppressMapTapUntilRef.current) {
+    if (shouldIgnoreMapTap(Date.now())) {
       return;
     }
 
@@ -155,9 +135,6 @@ const PlacePickerModalBody = ({
     setRecenterRequestId((prev) => prev + 1);
   };
 
-  const isSearchPanelVisible =
-    apiStatus.mode === 'search-enabled' && (isSearchFocused || keepSuggestionPanelVisible);
-
   return (
     <PlacePickerModalContentWeb
       addressLine={addressLine}
@@ -177,7 +154,7 @@ const PlacePickerModalBody = ({
       isSearchEnabled={apiStatus.mode === 'search-enabled'}
       isSearchFocused={isSearchFocused}
       isSearchLoading={isSearchLoading}
-      isSearchPanelVisible={isSearchPanelVisible}
+      isSearchPanelVisible={isSuggestionPanelRequested}
       locationStatusMessage={locationStatusMessage}
       mapCenteringLabel={t('map_centering')}
       mapError={mapError}
@@ -188,26 +165,24 @@ const PlacePickerModalBody = ({
       onMapError={setMapError}
       onMapPress={handleMapPress}
       onMarkerPress={handleMarkerPress}
-      onSearchBlur={handleSearchBlur}
+      onSearchBlur={blurSearch}
       onSearchChange={setSearchQuery}
       onSearchClear={() => {
         clearSearchQuery();
-        handleSearchClear();
+        clearSearchOverlay();
       }}
-      onSearchFocus={handleSearchFocus}
+      onSearchFocus={focusSearch}
       onSearchSubmit={() => {
         hidePlaceInfoSheet();
-        handleSearchSubmit();
+        submitSearch();
       }}
       onSheetLayout={handleSheetLayout}
       onSuggestionPress={(suggestion) => {
-        suppressMapTapUntilRef.current = Date.now() + 300;
         hideSearchUi();
         void handleSuggestionSelect(suggestion);
       }}
       onSuggestionPressIn={() => {
-        suppressMapTapUntilRef.current = Date.now() + 300;
-        handleSuggestionPressIn();
+        armSuggestionInteractionGuard(Date.now());
       }}
       onUseCurrentLocation={() => {
         void handleUseCurrentLocationPress();

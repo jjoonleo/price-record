@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, PanResponder } from 'react-native';
 
 type SheetLayoutEvent = {
@@ -12,62 +12,60 @@ type SheetLayoutEvent = {
 type UsePlacePickerSheetControllerParams = {
   initialHiddenOffset: number;
   useNativeDriver: boolean;
+  isPlaceInfoVisible: boolean;
+  showPlaceInfoSheet: () => void;
+  hidePlaceInfoSheet: () => void;
 };
 
 export const usePlacePickerSheetController = ({
   initialHiddenOffset,
-  useNativeDriver
+  useNativeDriver,
+  isPlaceInfoVisible,
+  showPlaceInfoSheet,
+  hidePlaceInfoSheet
 }: UsePlacePickerSheetControllerParams) => {
-  const [isPlaceInfoVisible, setIsPlaceInfoVisible] = useState(false);
   const [sheetHeight, setSheetHeight] = useState(0);
   const sheetTranslateY = useRef(new Animated.Value(initialHiddenOffset)).current;
+  const previousVisibilityRef = useRef(isPlaceInfoVisible);
 
   const getSheetHiddenOffset = useCallback(() => {
     return sheetHeight > 0 ? sheetHeight : initialHiddenOffset;
   }, [initialHiddenOffset, sheetHeight]);
 
   const animateSheet = useCallback(
-    (nextVisible: boolean, immediate = false) => {
+    (nextVisible: boolean) => {
       const hiddenOffset = getSheetHiddenOffset();
-
-      if (immediate) {
-        sheetTranslateY.setValue(nextVisible ? 0 : hiddenOffset);
-        setIsPlaceInfoVisible(nextVisible);
-        return;
-      }
-
-      if (nextVisible) {
-        setIsPlaceInfoVisible(true);
-      }
 
       Animated.timing(sheetTranslateY, {
         duration: 220,
         toValue: nextVisible ? 0 : hiddenOffset,
         useNativeDriver
-      }).start(({ finished }) => {
-        if (!nextVisible && finished) {
-          setIsPlaceInfoVisible(false);
-        }
-      });
+      }).start();
     },
     [getSheetHiddenOffset, sheetTranslateY, useNativeDriver]
   );
 
-  const showPlaceInfoSheet = useCallback(() => {
-    animateSheet(true);
-  }, [animateSheet]);
+  useEffect(() => {
+    if (previousVisibilityRef.current === isPlaceInfoVisible) {
+      return;
+    }
 
-  const hidePlaceInfoSheet = useCallback(
-    (immediate = false) => {
-      animateSheet(false, immediate);
-    },
-    [animateSheet]
-  );
+    previousVisibilityRef.current = isPlaceInfoVisible;
+    animateSheet(isPlaceInfoVisible);
+  }, [animateSheet, isPlaceInfoVisible]);
 
   const sheetPanResponder = useMemo(
     () =>
       PanResponder.create({
-        onMoveShouldSetPanResponder: () => isPlaceInfoVisible,
+        onMoveShouldSetPanResponder: (_, gestureState) => {
+          if (!isPlaceInfoVisible) {
+            return false;
+          }
+
+          const isVerticalDrag = Math.abs(gestureState.dy) > Math.abs(gestureState.dx);
+          const exceedsActivationThreshold = gestureState.dy > 6;
+          return isVerticalDrag && exceedsActivationThreshold;
+        },
         onPanResponderGrant: () => {
           sheetTranslateY.stopAnimation();
         },
@@ -110,18 +108,6 @@ export const usePlacePickerSheetController = ({
     [isPlaceInfoVisible, sheetTranslateY]
   );
 
-  const resetSheetForSession = useCallback(
-    (showInitially: boolean) => {
-      if (showInitially) {
-        showPlaceInfoSheet();
-        return;
-      }
-
-      hidePlaceInfoSheet(true);
-    },
-    [hidePlaceInfoSheet, showPlaceInfoSheet]
-  );
-
   const sheetHiddenOffset = sheetHeight > 0 ? sheetHeight : initialHiddenOffset;
   const controlsLiftDistance = useMemo(
     () => Math.max(72, Math.min(sheetHiddenOffset, 320)),
@@ -142,12 +128,8 @@ export const usePlacePickerSheetController = ({
     controlsTranslateY,
     getSheetHiddenOffset,
     handleSheetLayout,
-    hidePlaceInfoSheet,
-    isPlaceInfoVisible,
-    resetSheetForSession,
     sheetHiddenOffset,
     sheetPanHandlers: sheetPanResponder.panHandlers,
-    sheetTranslateY,
-    showPlaceInfoSheet
+    sheetTranslateY
   };
 };

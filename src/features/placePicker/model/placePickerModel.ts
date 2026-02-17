@@ -35,6 +35,11 @@ export type PlacePickerFeatureState = {
   mapError: string | null;
   initialSelectionQuery: string;
   didHydrateFromInitialSelection: boolean;
+  isPlaceInfoVisible: boolean;
+  isSearchFocused: boolean;
+  keepSuggestionPanelVisible: boolean;
+  suppressNextSearchBlur: boolean;
+  suppressMapTapUntilMs: number;
 };
 
 export type PlacePickerFeatureActions = {
@@ -47,6 +52,16 @@ export type PlacePickerFeatureActions = {
   setMapError: (message: string | null) => void;
   markHydrationAttempted: () => void;
   buildConfirmSelection: (notSelectedLabel: string) => PlaceSelection;
+  showPlaceInfoSheet: () => void;
+  hidePlaceInfoSheet: () => void;
+  resetOverlayVisibility: (showPlaceInfoInitially: boolean) => void;
+  focusSearch: () => void;
+  blurSearch: () => void;
+  submitSearch: () => void;
+  clearSearchOverlay: () => void;
+  hideSearchUi: () => void;
+  armSuggestionInteractionGuard: (nowMs: number, durationMs?: number) => void;
+  shouldIgnoreMapTap: (nowMs: number) => boolean;
 };
 
 export type PlacePickerStoreState = PlacePickerFeatureState & PlacePickerFeatureActions;

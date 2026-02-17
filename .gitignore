@@ -3,6 +3,8 @@ node_modules
 .expo
 .codex
 dist
+dist-android/
+dist-ios/
 web-build
 storybook-static
 .storybook/settings.json

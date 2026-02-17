@@ -3,7 +3,6 @@ import { Dimensions, Keyboard } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PlacePickerModalContentNative } from './placePicker/PlacePickerModalContent.native';
 import { usePlacePickerNativeMapUiState } from './placePicker/hooks/usePlacePickerNativeMapUiState';
-import { usePlacePickerSearchUiState } from './placePicker/hooks/usePlacePickerSearchUiState';
 import { usePlacePickerSheetController } from './placePicker/hooks/usePlacePickerSheetController';
 import { usePlacePickerController } from '../features/placePicker/hooks/usePlacePickerController';
 import {
@@ -38,32 +37,6 @@ const PlacePickerModalBody = ({
   const hasOpenedRef = useRef(false);
 
   const {
-    handleSearchBlur,
-    handleSearchClear,
-    handleSearchFocus,
-    handleSearchSubmit,
-    handleSuggestionPressIn,
-    hideSearchUi,
-    isSearchFocused,
-    keepSuggestionPanelVisible,
-    resetSearchUiForSession
-  } = usePlacePickerSearchUiState();
-
-  const {
-    controlsTranslateY,
-    handleSheetLayout,
-    hidePlaceInfoSheet,
-    isPlaceInfoVisible,
-    resetSheetForSession,
-    sheetPanHandlers,
-    sheetTranslateY,
-    showPlaceInfoSheet
-  } = usePlacePickerSheetController({
-    initialHiddenOffset: Dimensions.get('window').height,
-    useNativeDriver: true
-  });
-
-  const {
     apiStatus,
     searchQuery,
     suggestions,
@@ -80,11 +53,23 @@ const PlacePickerModalBody = ({
     isLocatingCurrent,
     isResolvingAddress,
     locationStatusMessage,
+    isPlaceInfoVisible,
+    isSearchFocused,
+    isSuggestionPanelRequested,
     setSearchQuery,
     clearSearchQuery,
     handleSuggestionSelect,
     handleUseCurrentLocation,
-    handleConfirmSelection
+    handleConfirmSelection,
+    showPlaceInfoSheet,
+    hidePlaceInfoSheet,
+    focusSearch,
+    blurSearch,
+    submitSearch,
+    clearSearchOverlay,
+    hideSearchUi,
+    armSuggestionInteractionGuard,
+    shouldIgnoreMapTap
   } = usePlacePickerController({
     visible,
     initialCoordinates,
@@ -92,8 +77,7 @@ const PlacePickerModalBody = ({
     showPlaceInfoInitially,
     notSelectedLabel,
     onClose,
-    onConfirm,
-    onSuggestionApplied: showPlaceInfoSheet
+    onConfirm
   });
 
   const fallbackMessage = useMemo(() => buildFallbackMessage(apiStatus, (key) => t(key)), [apiStatus, t]);
@@ -107,11 +91,25 @@ const PlacePickerModalBody = ({
   );
 
   const {
+    controlsTranslateY,
+    handleSheetLayout,
+    sheetPanHandlers,
+    sheetTranslateY
+  } = usePlacePickerSheetController({
+    initialHiddenOffset: Dimensions.get('window').height,
+    useNativeDriver: true,
+    isPlaceInfoVisible,
+    showPlaceInfoSheet,
+    hidePlaceInfoSheet
+  });
+
+  const {
     clearTrackingMode,
     handleMapPress,
     handleMarkerPress,
     handleRecenter,
     handleRegionChangeComplete,
+    handleUserLocationChange,
     handleUseCurrentLocationPress,
     mapRegion,
     resetMapUiForSession,
@@ -124,6 +122,7 @@ const PlacePickerModalBody = ({
     hideSearchUi,
     initialCoordinates,
     isPlaceInfoVisible,
+    shouldIgnoreMapTap,
     showPlaceInfoSheet,
     visible
   });
@@ -143,19 +142,7 @@ const PlacePickerModalBody = ({
 
     hasOpenedRef.current = true;
     resetMapUiForSession(initialCoordinates);
-    resetSearchUiForSession();
-    resetSheetForSession(showPlaceInfoInitially);
-  }, [
-    initialCoordinates,
-    resetMapUiForSession,
-    resetSearchUiForSession,
-    resetSheetForSession,
-    showPlaceInfoInitially,
-    visible
-  ]);
-
-  const isSearchPanelVisible =
-    apiStatus.mode === 'search-enabled' && (isSearchFocused || keepSuggestionPanelVisible);
+  }, [initialCoordinates, resetMapUiForSession, visible]);
 
   return (
     <PlacePickerModalContentNative
@@ -176,7 +163,7 @@ const PlacePickerModalBody = ({
       isSearchEnabled={apiStatus.mode === 'search-enabled'}
       isSearchFocused={isSearchFocused}
       isSearchLoading={isSearchLoading}
-      isSearchPanelVisible={isSearchPanelVisible}
+      isSearchPanelVisible={isSuggestionPanelRequested}
       locationStatusMessage={locationStatusMessage}
       mapCenteringLabel={t('map_centering')}
       mapRegion={mapRegion}
@@ -190,16 +177,17 @@ const PlacePickerModalBody = ({
       onMarkerPress={handleMarkerPress}
       onRecenter={handleRecenter}
       onRegionChangeComplete={handleRegionChangeComplete}
-      onSearchBlur={handleSearchBlur}
+      onUserLocationChange={handleUserLocationChange}
+      onSearchBlur={blurSearch}
       onSearchChange={setSearchQuery}
       onSearchClear={() => {
         clearSearchQuery();
-        handleSearchClear();
+        clearSearchOverlay();
       }}
-      onSearchFocus={handleSearchFocus}
+      onSearchFocus={focusSearch}
       onSearchSubmit={() => {
         hidePlaceInfoSheet();
-        handleSearchSubmit();
+        submitSearch();
       }}
       onSheetLayout={handleSheetLayout}
       onSuggestionPress={(suggestion) => {
@@ -207,7 +195,9 @@ const PlacePickerModalBody = ({
         Keyboard.dismiss();
         void handleSuggestionSelect(suggestion);
       }}
-      onSuggestionPressIn={handleSuggestionPressIn}
+      onSuggestionPressIn={() => {
+        armSuggestionInteractionGuard(Date.now());
+      }}
       onUseCurrentLocation={() => {
         void handleUseCurrentLocationPress();
       }}

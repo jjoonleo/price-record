@@ -18,6 +18,7 @@ const nativeArgs = {
   onPanDrag: fn(),
   onRegionChangeComplete: fn(),
   onMarkerPress: fn(),
+  onUserLocationChange: fn(),
 };
 
 const webExtraProps = {
@@ -44,9 +45,12 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-export const Default: Story = {};
+export const Default: Story = {
+  args: nativeArgs,
+};
 
 export const NoPlaceInfo: Story = {
+  args: nativeArgs,
   render: (args) => (
     <View style={{ backgroundColor: '#E2E8F0', height: 300, overflow: 'hidden', width: '100%' }}>
       <PlacePickerMapSurface {...args} {...webExtraProps} hasPlaceInfo={false} />

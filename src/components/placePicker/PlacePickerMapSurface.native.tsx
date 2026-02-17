@@ -1,5 +1,12 @@
 import { Platform, StyleSheet, View } from 'react-native';
-import MapView, { Details, MapPressEvent, Marker, PROVIDER_GOOGLE, Region } from 'react-native-maps';
+import MapView, {
+  Details,
+  MapPressEvent,
+  Marker,
+  PROVIDER_GOOGLE,
+  Region,
+  UserLocationChangeEvent
+} from 'react-native-maps';
 import { colors } from '../../theme/tokens';
 import { Coordinates } from '../../types/domain';
 import { regionFromCoordinates } from './placePickerMapUtils';
@@ -14,6 +21,7 @@ type PlacePickerMapSurfaceProps = {
   onPanDrag: () => void;
   onRegionChangeComplete: (region: Region, details?: Details) => void;
   onMarkerPress: () => void;
+  onUserLocationChange: (coordinates: Coordinates) => void;
 };
 
 export const PlacePickerMapSurface = ({
@@ -25,7 +33,8 @@ export const PlacePickerMapSurface = ({
   onMapPress,
   onPanDrag,
   onRegionChangeComplete,
-  onMarkerPress
+  onMarkerPress,
+  onUserLocationChange
 }: PlacePickerMapSurfaceProps) => {
   const fallbackRegion = regionFromCoordinates(region);
   const normalizedRegion: Region = {
@@ -51,16 +60,30 @@ export const PlacePickerMapSurface = ({
     return <View style={styles.map} />;
   }
 
-  const providerProps = Platform.OS === 'android' ? { provider: PROVIDER_GOOGLE as const } : {};
-
   return (
     <MapView
-      {...providerProps}
+      {...(Platform.OS === 'android' ? { provider: PROVIDER_GOOGLE } : {})}
       onPress={onMapPress}
       onPanDrag={onPanDrag}
       onRegionChangeComplete={onRegionChangeComplete}
+      onUserLocationChange={(event: UserLocationChangeEvent) => {
+        const coordinate = event.nativeEvent.coordinate;
+        if (!coordinate) {
+          return;
+        }
+
+        if (!Number.isFinite(coordinate.latitude) || !Number.isFinite(coordinate.longitude)) {
+          return;
+        }
+
+        onUserLocationChange({
+          latitude: coordinate.latitude,
+          longitude: coordinate.longitude
+        });
+      }}
       region={normalizedRegion}
       showsUserLocation
+      {...(Platform.OS === 'android' ? { showsMyLocationButton: false } : {})}
       style={styles.map}
       {...(Platform.OS === 'ios' ? { followsUserLocation } : {})}
       {...(Platform.OS === 'android' ? { googleRenderer: 'LEGACY' as const } : {})}
