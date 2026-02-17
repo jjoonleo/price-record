@@ -108,21 +108,25 @@ Then start Expo normally:
 npx expo start --tunnel --clear
 ```
 
-For Android map rendering, add your Google Maps API key in `app.json`:
+For Android map rendering (especially release/prod), provide a Maps SDK key through build config:
 
-```json
-{
-  "android": {
-    "config": {
-      "googleMaps": {
-        "apiKey": "your_google_maps_api_key"
-      }
-    }
-  }
-}
+```bash
+# android/gradle.properties (local)
+GOOGLE_MAPS_API_KEY=your_google_maps_sdk_key
 ```
 
-The same Google Cloud project can usually provide both API keys if Maps SDK and Places APIs are enabled.
+Or pass it per build:
+
+```bash
+GOOGLE_MAPS_API_KEY=your_google_maps_sdk_key ./gradlew app:assembleRelease
+```
+
+Production blank-map checklist:
+
+- Enable `Maps SDK for Android` in Google Cloud for that key.
+- Use Android app restrictions with package `com.ejunpark.japanpricetracker`.
+- Add the correct SHA-1 fingerprints (release cert for prod, debug cert for local).
+- Keep Places key and Maps key separate if restrictions differ.
 
 ## Test
 

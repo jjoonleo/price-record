@@ -37,7 +37,7 @@
       "package": "com.ejunpark.japanpricetracker",
       "config": {
         "googleMaps": {
-          "apiKey": "AIzaSyBLfI5pf9JRt1fYZffrM374SjSD5he_xOc"
+          "apiKey": "AIzaSyBfj_5rOADm6AlucgJZZ76JFnYjVyzhIJI"
         }
       },
       "icon": "./public/icons/icon-1024.png",

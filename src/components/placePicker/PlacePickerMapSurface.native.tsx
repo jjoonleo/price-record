@@ -1,5 +1,5 @@
 import { Platform, StyleSheet, View } from 'react-native';
-import MapView, { MapPressEvent, Marker, Region } from 'react-native-maps';
+import MapView, { Details, MapPressEvent, Marker, PROVIDER_GOOGLE, Region } from 'react-native-maps';
 import { colors } from '../../theme/tokens';
 import { Coordinates } from '../../types/domain';
 import { regionFromCoordinates } from './placePickerMapUtils';
@@ -12,7 +12,7 @@ type PlacePickerMapSurfaceProps = {
   followsUserLocation: boolean;
   onMapPress: (event: MapPressEvent) => void;
   onPanDrag: () => void;
-  onRegionChangeComplete: (region: Region) => void;
+  onRegionChangeComplete: (region: Region, details?: Details) => void;
   onMarkerPress: () => void;
 };
 
@@ -46,6 +46,7 @@ export const PlacePickerMapSurface = ({
 
   return (
     <MapView
+      provider={PROVIDER_GOOGLE}
       onPress={onMapPress}
       onPanDrag={onPanDrag}
       onRegionChangeComplete={onRegionChangeComplete}
@@ -53,6 +54,7 @@ export const PlacePickerMapSurface = ({
       showsUserLocation
       style={styles.map}
       {...(Platform.OS === 'ios' ? { followsUserLocation } : {})}
+      {...(Platform.OS === 'android' ? { googleRenderer: 'LEGACY' as const } : {})}
     >
       {currentLocationCoordinates ? (
         <Marker coordinate={currentLocationCoordinates} anchor={{ x: 0.5, y: 0.5 }}>

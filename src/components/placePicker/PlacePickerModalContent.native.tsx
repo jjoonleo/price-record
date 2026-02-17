@@ -1,5 +1,5 @@
 import { Animated, Keyboard, Linking, Platform } from 'react-native';
-import { Region } from 'react-native-maps';
+import { Details, Region } from 'react-native-maps';
 import { PlaceSuggestion } from '../../services/placesService';
 import { Coordinates } from '../../types/domain';
 import { PlacePickerConfirmAction } from './PlacePickerConfirmAction';
@@ -34,7 +34,7 @@ type PlacePickerModalContentNativeProps = {
   onMapPress: () => void;
   onMarkerPress: () => void;
   onMapPanDrag: () => void;
-  onRegionChangeComplete: (region: Region) => void;
+  onRegionChangeComplete: (region: Region, details?: Details) => void;
   mapRegion: Region;
   followsUserLocation: boolean;
   clearAccessibilityLabel: string;

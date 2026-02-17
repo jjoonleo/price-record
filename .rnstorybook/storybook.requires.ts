@@ -8,13 +8,37 @@ const normalizedStories = [
   {
     titlePrefix: "",
     directory: "./src/components",
-    files: "**/*.stories.?(ts|tsx|js|jsx)",
-    importPathMatcher: /^\.(?:(?:^|\/|(?:(?:(?!(?:^|\/)\.).)*?)\/)(?!\.)(?=.)[^/]*?\.stories\.(?:ts|tsx|js|jsx)?)$/,
+    files: "**/*.stories.@(ts|tsx|js|jsx)",
+    importPathMatcher: /^\.(?:(?:^|\/|(?:(?:(?!(?:^|\/)\.).)*?)\/)(?!\.)(?=.)[^/]*?\.stories\.(ts|tsx|js|jsx))$/,
     // @ts-ignore
     req: require.context(
       '../src/components',
       true,
-      /^\.(?:(?:^|\/|(?:(?:(?!(?:^|\/)\.).)*?)\/)(?!\.)(?=.)[^/]*?\.stories\.(?:ts|tsx|js|jsx)?)$/
+      /^\.(?:(?:^|\/|(?:(?:(?!(?:^|\/)\.).)*?)\/)(?!\.)(?=.)[^/]*?\.stories\.(ts|tsx|js|jsx))$/
+    ),
+  },
+  {
+    titlePrefix: "",
+    directory: "./src/components",
+    files: "**/*.stories.native.@(ts|tsx|js|jsx)",
+    importPathMatcher: /^\.(?:(?:^|\/|(?:(?:(?!(?:^|\/)\.).)*?)\/)(?!\.)(?=.)[^/]*?\.stories\.native\.(ts|tsx|js|jsx))$/,
+    // @ts-ignore
+    req: require.context(
+      '../src/components',
+      true,
+      /^\.(?:(?:^|\/|(?:(?:(?!(?:^|\/)\.).)*?)\/)(?!\.)(?=.)[^/]*?\.stories\.native\.(ts|tsx|js|jsx))$/
+    ),
+  },
+  {
+    titlePrefix: "",
+    directory: "./.rnstorybook/!../src/components/placePicker",
+    files: "PlacePickerModalContent.stories.@(ts|tsx|js|jsx)",
+    importPathMatcher: /^\.[\\/](?:PlacePickerModalContent\.stories\.(ts|tsx|js|jsx))$/,
+    // @ts-ignore
+    req: require.context(
+      './!../src/components/placePicker',
+      false,
+      /^\.[\\/](?:PlacePickerModalContent\.stories\.(ts|tsx|js|jsx))$/
     ),
   }
 ];

@@ -111,10 +111,10 @@ const PlacePickerModalBody = ({
     handleMapPress,
     handleMarkerPress,
     handleRecenter,
+    handleRegionChangeComplete,
     handleUseCurrentLocationPress,
     mapRegion,
     resetMapUiForSession,
-    setMapRegion,
     followsUserLocation
   } = usePlacePickerNativeMapUiState({
     coordinates,
@@ -189,7 +189,7 @@ const PlacePickerModalBody = ({
       onMapPress={handleMapPress}
       onMarkerPress={handleMarkerPress}
       onRecenter={handleRecenter}
-      onRegionChangeComplete={setMapRegion}
+      onRegionChangeComplete={handleRegionChangeComplete}
       onSearchBlur={handleSearchBlur}
       onSearchChange={setSearchQuery}
       onSearchClear={() => {

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Keyboard } from 'react-native';
-import { Region } from 'react-native-maps';
+import { Keyboard, Platform } from 'react-native';
+import { Details, Region } from 'react-native-maps';
 import { Coordinates } from '../../../types/domain';
 import { regionFromCoordinates } from '../placePickerMapUtils';
 
@@ -92,15 +92,49 @@ export const usePlacePickerNativeMapUiState = ({
     setMapRegion(regionFromCoordinates(coordinates));
   }, [clearTrackingMode, coordinates]);
 
+  const handleRegionChangeComplete = useCallback((nextRegion: Region, details?: Details) => {
+    if (Platform.OS === 'android' && details?.isGesture === false) {
+      return;
+    }
+
+    setMapRegion((previousRegion) => {
+      const nextLatitude = Number.isFinite(nextRegion.latitude) ? nextRegion.latitude : previousRegion.latitude;
+      const nextLongitude = Number.isFinite(nextRegion.longitude) ? nextRegion.longitude : previousRegion.longitude;
+      const nextLatitudeDelta =
+        Number.isFinite(nextRegion.latitudeDelta) && nextRegion.latitudeDelta > 0
+          ? nextRegion.latitudeDelta
+          : previousRegion.latitudeDelta;
+      const nextLongitudeDelta =
+        Number.isFinite(nextRegion.longitudeDelta) && nextRegion.longitudeDelta > 0
+          ? nextRegion.longitudeDelta
+          : previousRegion.longitudeDelta;
+
+      const normalizedRegion: Region = {
+        latitude: nextLatitude,
+        longitude: nextLongitude,
+        latitudeDelta: nextLatitudeDelta,
+        longitudeDelta: nextLongitudeDelta
+      };
+
+      const hasMeaningfulChange =
+        Math.abs(previousRegion.latitude - normalizedRegion.latitude) > 0.000001 ||
+        Math.abs(previousRegion.longitude - normalizedRegion.longitude) > 0.000001 ||
+        Math.abs(previousRegion.latitudeDelta - normalizedRegion.latitudeDelta) > 0.000001 ||
+        Math.abs(previousRegion.longitudeDelta - normalizedRegion.longitudeDelta) > 0.000001;
+
+      return hasMeaningfulChange ? normalizedRegion : previousRegion;
+    });
+  }, []);
+
   return {
     clearTrackingMode,
     handleMapPress,
     handleMarkerPress,
     handleRecenter,
+    handleRegionChangeComplete,
     handleUseCurrentLocationPress,
     mapRegion,
     resetMapUiForSession,
-    setMapRegion,
     followsUserLocation
   };
 };
