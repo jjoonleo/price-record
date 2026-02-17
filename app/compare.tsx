@@ -236,6 +236,10 @@ export default function CompareScreen() {
     [router, selectedProduct, t]
   );
 
+  const handleBack = useCallback(() => {
+    router.navigate('/');
+  }, [router]);
+
   const handleNavigateFromCompare = useCallback(
     async (item: StoreComparison) => {
       const didOpen = await openExternalRoute({

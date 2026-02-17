@@ -4,11 +4,16 @@ import { CSSProperties, useEffect, useRef } from 'react';
 import { StyleSheet, View } from 'react-native';
 import 'leaflet/dist/leaflet.css';
 import { colors } from '../../theme/tokens';
+import { ProductPriceMapHeaderActions } from './ProductPriceMapHeaderActions';
 
 type ProductPriceMapHeroProps = {
   width: number;
   latitude: number;
   longitude: number;
+  isFavorite: boolean;
+  onBack: () => void;
+  onFavorite: () => void;
+  onShare: () => void;
 };
 
 const HERO_ASPECT_RATIO = 397.8 / 390;
@@ -16,7 +21,11 @@ const HERO_ASPECT_RATIO = 397.8 / 390;
 export const ProductPriceMapHero = ({
   width,
   latitude,
-  longitude
+  longitude,
+  isFavorite,
+  onBack,
+  onFavorite,
+  onShare
 }: ProductPriceMapHeroProps) => {
   const height = width * HERO_ASPECT_RATIO;
   const mapNodeRef = useRef<HTMLDivElement | null>(null);
@@ -66,7 +75,7 @@ export const ProductPriceMapHero = ({
         mapRef.current = null;
       }
     };
-  }, []);
+  }, [latitude, longitude]);
 
   useEffect(() => {
     if (!mapRef.current) {
@@ -94,6 +103,15 @@ export const ProductPriceMapHero = ({
         </View>
       </View>
 
+      <View pointerEvents="box-none" style={styles.headerOverlay}>
+        <ProductPriceMapHeaderActions
+          isFavorite={isFavorite}
+          onBack={onBack}
+          onFavorite={onFavorite}
+          onShare={onShare}
+        />
+      </View>
+
     </View>
   );
 };
@@ -103,6 +121,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#E5E7EB',
     overflow: 'hidden',
     position: 'relative'
+  },
+  headerOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 60
   },
   mapPinWrap: {
     alignItems: 'center',

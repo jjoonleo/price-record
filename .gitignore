@@ -1,8 +1,11 @@
 node_modules
+.npm
 .expo
 .codex
 dist
 web-build
+storybook-static
+.storybook/settings.json
 *.log
 coverage
 .DS_Store

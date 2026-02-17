@@ -6,7 +6,6 @@ import {
   ProductPriceActionButtons,
   ProductPriceDetailInvalidState,
   ProductPriceEntryCard,
-  ProductPriceMapHeaderActions,
   ProductPriceMapHero,
   ProductPriceStatusMessage,
   ProductPriceStoreSummaryCard
@@ -94,15 +93,13 @@ export default function ProductPriceDetailScreen() {
         <View style={[styles.mainColumn, { width: frameWidth }]}>
           <View style={[styles.mapHeroWrap, { width: frameWidth }]}>
             <ProductPriceMapHero
+              isFavorite={isFavorite}
               latitude={parsedParams.latitude}
               longitude={parsedParams.longitude}
-              width={frameWidth}
-            />
-            <ProductPriceMapHeaderActions
-              isFavorite={isFavorite}
               onBack={handleBack}
               onFavorite={() => setIsFavorite((current) => !current)}
               onShare={() => setStatusMessage(t('detail_share_pending'))}
+              width={frameWidth}
             />
           </View>
 
