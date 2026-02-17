@@ -6,6 +6,7 @@ export { ProductPriceEntryCard } from './ProductPriceEntryCard';
 export { ProductPriceHero } from './ProductPriceHero';
 export { ProductPriceInformationSection } from './ProductPriceInformationSection';
 export { ProductPriceLocationSection } from './ProductPriceLocationSection';
+export { ProductPriceMapHeaderActions } from './ProductPriceMapHeaderActions';
 export { ProductPriceMapHero } from './ProductPriceMapHero';
 export { ProductPriceNotesSection } from './ProductPriceNotesSection';
 export { ProductPriceStatusMessage } from './ProductPriceStatusMessage';

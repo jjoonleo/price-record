@@ -1,7 +1,7 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { CSSProperties, useEffect, useRef } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import 'leaflet/dist/leaflet.css';
 import { colors } from '../../theme/tokens';
 
@@ -9,10 +9,6 @@ type ProductPriceMapHeroProps = {
   width: number;
   latitude: number;
   longitude: number;
-  isFavorite: boolean;
-  onBack: () => void;
-  onFavorite: () => void;
-  onShare: () => void;
 };
 
 const HERO_ASPECT_RATIO = 397.8 / 390;
@@ -20,11 +16,7 @@ const HERO_ASPECT_RATIO = 397.8 / 390;
 export const ProductPriceMapHero = ({
   width,
   latitude,
-  longitude,
-  isFavorite,
-  onBack,
-  onFavorite,
-  onShare
+  longitude
 }: ProductPriceMapHeroProps) => {
   const height = width * HERO_ASPECT_RATIO;
   const mapNodeRef = useRef<HTMLDivElement | null>(null);
@@ -102,36 +94,6 @@ export const ProductPriceMapHero = ({
         </View>
       </View>
 
-      <View style={styles.headerRow}>
-        <Pressable
-          accessibilityLabel="detail-back-button"
-          accessibilityRole="button"
-          onPress={onBack}
-          style={({ pressed }) => [styles.circleButton, pressed && styles.pressed]}
-        >
-          <MaterialCommunityIcons color={colors.primary} name="chevron-left" size={17} />
-        </Pressable>
-
-        <View style={styles.headerActions}>
-          <Pressable
-            accessibilityLabel="detail-favorite-button"
-            accessibilityRole="button"
-            onPress={onFavorite}
-            style={({ pressed }) => [styles.circleButton, pressed && styles.pressed]}
-          >
-            <MaterialCommunityIcons color={colors.primary} name={isFavorite ? 'heart' : 'heart-outline'} size={16} />
-          </Pressable>
-
-          <Pressable
-            accessibilityLabel="detail-share-button"
-            accessibilityRole="button"
-            onPress={onShare}
-            style={({ pressed }) => [styles.circleButton, pressed && styles.pressed]}
-          >
-            <MaterialCommunityIcons color={colors.primary} name="share-variant" size={16} />
-          </Pressable>
-        </View>
-      </View>
     </View>
   );
 };
@@ -142,39 +104,14 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     position: 'relative'
   },
-  headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    left: 0,
-    paddingHorizontal: 16,
-    paddingTop: 48,
-    position: 'absolute',
-    right: 0,
-    top: 0
-  },
-  headerActions: {
-    flexDirection: 'row',
-    gap: 12
-  },
-  circleButton: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.9)',
-    borderRadius: 16,
-    height: 32,
-    justifyContent: 'center',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 2,
-    width: 32
-  },
   mapPinWrap: {
     alignItems: 'center',
     justifyContent: 'center',
     left: 0,
     position: 'absolute',
     right: 0,
-    top: '45%'
+    top: '45%',
+    zIndex: 30
   },
   pinHalo: {
     backgroundColor: 'rgba(0,122,255,0.3)',
@@ -192,13 +129,12 @@ const styles = StyleSheet.create({
     height: 40,
     justifyContent: 'center',
     width: 40
-  },
-  pressed: {
-    opacity: 0.82
   }
 });
 
 const mapStyle: CSSProperties = {
   height: '100%',
+  position: 'relative',
+  zIndex: 0,
   width: '100%'
 };

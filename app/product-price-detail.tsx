@@ -6,6 +6,7 @@ import {
   ProductPriceActionButtons,
   ProductPriceDetailInvalidState,
   ProductPriceEntryCard,
+  ProductPriceMapHeaderActions,
   ProductPriceMapHero,
   ProductPriceStatusMessage,
   ProductPriceStoreSummaryCard
@@ -91,15 +92,19 @@ export default function ProductPriceDetailScreen() {
     <SafeAreaView edges={['top']} style={styles.screen}>
       <ScrollView bounces={false} contentContainerStyle={styles.scrollContent}>
         <View style={[styles.mainColumn, { width: frameWidth }]}>
-          <ProductPriceMapHero
-            isFavorite={isFavorite}
-            latitude={parsedParams.latitude}
-            longitude={parsedParams.longitude}
-            onBack={handleBack}
-            onFavorite={() => setIsFavorite((current) => !current)}
-            onShare={() => setStatusMessage(t('detail_share_pending'))}
-            width={frameWidth}
-          />
+          <View style={[styles.mapHeroWrap, { width: frameWidth }]}>
+            <ProductPriceMapHero
+              latitude={parsedParams.latitude}
+              longitude={parsedParams.longitude}
+              width={frameWidth}
+            />
+            <ProductPriceMapHeaderActions
+              isFavorite={isFavorite}
+              onBack={handleBack}
+              onFavorite={() => setIsFavorite((current) => !current)}
+              onShare={() => setStatusMessage(t('detail_share_pending'))}
+            />
+          </View>
 
           <View style={[styles.sheet, { width: frameWidth }]}>
             <ProductPriceStoreSummaryCard
@@ -149,6 +154,9 @@ const styles = StyleSheet.create({
   mainColumn: {
     alignItems: 'center',
     minHeight: '100%'
+  },
+  mapHeroWrap: {
+    position: 'relative'
   },
   sheet: {
     alignItems: 'center',
