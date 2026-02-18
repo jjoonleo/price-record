@@ -13,6 +13,7 @@ const meta = {
     vsAvgLabel: 'vs Avg',
     lastVerifiedText: 'Last verified 2h ago',
     navigateLabel: 'Navigate',
+    onPressCard: () => {},
     onNavigate: () => {},
   },
   render: (args) => (

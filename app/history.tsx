@@ -125,6 +125,38 @@ export default function HistoryScreen() {
     });
   }, [entries, locale]);
 
+  const storesById = useMemo(() => {
+    return new Map(stores.map((store) => [store.id, store]));
+  }, [stores]);
+
+  const handleOpenDetail = useCallback(
+    (entry: HistoryEntry) => {
+      const store = storesById.get(entry.storeId);
+      if (!store) {
+        return;
+      }
+
+      router.navigate({
+        pathname: '/product-price-detail',
+        params: {
+          productId: entry.productId,
+          productName: entry.productName,
+          priceEntryId: entry.id,
+          entryId: entry.id,
+          storeId: entry.storeId,
+          storeName: entry.storeName,
+          cityArea: entry.cityArea,
+          addressLine: store.addressLine || undefined,
+          latitude: String(store.latitude),
+          longitude: String(store.longitude),
+          latestPriceYen: String(entry.priceYen),
+          observedAt: entry.observedAt
+        }
+      });
+    },
+    [router, storesById]
+  );
+
   const activeFilterCount = Number(Boolean(selectedProductFilterId)) + Number(Boolean(selectedStoreFilterId));
 
   return (
@@ -172,33 +204,39 @@ export default function HistoryScreen() {
 
                 <View style={styles.timelineContent}>
                   <Text style={styles.timelineDate}>{timelineLabel}</Text>
-                  <AppCard style={styles.entryCard}>
-                    <View style={styles.entryTopRow}>
-                      <View style={styles.entryLeft}>
-                        <Text style={styles.entryTitle}>{entry.productName}</Text>
-                        <View style={styles.entryMetaRow}>
-                          <View style={[styles.storeBadge, { backgroundColor: badge.color }]}>
-                            <Text style={[styles.storeBadgeText, { color: badge.textColor }]}>{badge.label}</Text>
-                          </View>
-                          <Text style={styles.entryMetaText} numberOfLines={1}>
-                            {entry.storeName}, {entry.cityArea}
-                          </Text>
-                        </View>
-                      </View>
-                      <View style={styles.entryPriceWrap}>
-                        <Text style={[styles.entryPrice, isLatest && styles.entryPriceLatest]}>
-                          {formatYen(entry.priceYen, locale).replace('JP¥', '¥')}
-                        </Text>
-                        {priceDelta !== null && priceDelta !== 0 ? (
-                          <View style={[styles.deltaChip, priceDelta < 0 ? styles.deltaDrop : styles.deltaRise]}>
-                            <Text style={[styles.deltaText, priceDelta < 0 ? styles.deltaDropText : styles.deltaRiseText]}>
-                              {priceDelta > 0 ? '+' : ''}{formatYen(priceDelta, locale).replace('JP¥', '¥')}
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() => handleOpenDetail(entry)}
+                    style={({ pressed }) => [pressed && styles.pressed]}
+                  >
+                    <AppCard style={styles.entryCard}>
+                      <View style={styles.entryTopRow}>
+                        <View style={styles.entryLeft}>
+                          <Text style={styles.entryTitle}>{entry.productName}</Text>
+                          <View style={styles.entryMetaRow}>
+                            <View style={[styles.storeBadge, { backgroundColor: badge.color }]}>
+                              <Text style={[styles.storeBadgeText, { color: badge.textColor }]}>{badge.label}</Text>
+                            </View>
+                            <Text style={styles.entryMetaText} numberOfLines={1}>
+                              {entry.storeName}, {entry.cityArea}
                             </Text>
                           </View>
-                        ) : null}
+                        </View>
+                        <View style={styles.entryPriceWrap}>
+                          <Text style={[styles.entryPrice, isLatest && styles.entryPriceLatest]}>
+                            {formatYen(entry.priceYen, locale).replace('JP¥', '¥')}
+                          </Text>
+                          {priceDelta !== null && priceDelta !== 0 ? (
+                            <View style={[styles.deltaChip, priceDelta < 0 ? styles.deltaDrop : styles.deltaRise]}>
+                              <Text style={[styles.deltaText, priceDelta < 0 ? styles.deltaDropText : styles.deltaRiseText]}>
+                                {priceDelta > 0 ? '+' : ''}{formatYen(priceDelta, locale).replace('JP¥', '¥')}
+                              </Text>
+                            </View>
+                          ) : null}
+                        </View>
                       </View>
-                    </View>
-                  </AppCard>
+                    </AppCard>
+                  </Pressable>
                 </View>
               </View>
             );

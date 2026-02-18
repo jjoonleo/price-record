@@ -1,6 +1,6 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { PrimaryButton } from '../ui/PrimaryButton';
 import { colors, typography } from '../../theme/tokens';
 
@@ -12,6 +12,7 @@ type CompareBestValueCardProps = {
   vsAvgLabel: string;
   lastVerifiedText: string;
   navigateLabel: string;
+  onPressCard: () => void;
   onNavigate: () => void;
 };
 
@@ -23,14 +24,16 @@ export const CompareBestValueCard = ({
   vsAvgLabel,
   lastVerifiedText,
   navigateLabel,
+  onPressCard,
   onNavigate
 }: CompareBestValueCardProps) => {
   return (
     <LinearGradient colors={['#137FEC', '#2563EB']} end={{ x: 1, y: 1 }} start={{ x: 0, y: 0 }} style={styles.bestCard}>
+      <Pressable accessibilityRole="button" onPress={onPressCard} style={({ pressed }) => [styles.cardTapArea, pressed && styles.pressed]} />
       <View pointerEvents="none" style={styles.bestCardOrbTop} />
       <View pointerEvents="none" style={styles.bestCardOrbBottom} />
 
-      <View style={styles.bestCardTopRow}>
+      <View pointerEvents="none" style={styles.bestCardTopRow}>
         <View>
           <View style={styles.bestLabelRow}>
             <MaterialCommunityIcons color="#DBEAFE" name="star-circle-outline" size={12} />
@@ -48,8 +51,8 @@ export const CompareBestValueCard = ({
         </View>
       </View>
 
-      <View style={styles.bestCardFooterRow}>
-        <View style={styles.verifiedRow}>
+      <View pointerEvents="box-none" style={styles.bestCardFooterRow}>
+        <View pointerEvents="none" style={styles.verifiedRow}>
           <MaterialCommunityIcons color="#DBEAFE" name="clock-outline" size={13} />
           <Text numberOfLines={1} style={styles.verifiedText}>
             {lastVerifiedText}
@@ -74,6 +77,9 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     padding: 20,
     position: 'relative'
+  },
+  cardTapArea: {
+    ...StyleSheet.absoluteFillObject
   },
   bestCardOrbTop: {
     backgroundColor: 'rgba(255,255,255,0.1)',
@@ -184,5 +190,8 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     lineHeight: 20
+  },
+  pressed: {
+    backgroundColor: 'rgba(255,255,255,0.08)'
   }
 });

@@ -213,6 +213,9 @@ export const CompareScreenContainer = () => {
                       lastVerifiedLabel ?? t('compare_last_verified', { time: 'now' })
                     }
                     navigateLabel={t('compare_navigate')}
+                    onPressCard={() => {
+                      goToDetail(topChoice);
+                    }}
                     onNavigate={() => {
                       void openDirections(topChoice);
                     }}
