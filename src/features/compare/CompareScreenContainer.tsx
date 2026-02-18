@@ -26,6 +26,7 @@ import { ProductOption, StoreComparison } from '../../types/domain';
 import { buildProductPriceDetailRouteParams } from '../../utils/productPriceDetail';
 import { resolveProductImageSource } from '../../utils/productImage';
 import { formatYen } from '../../utils/formatters';
+import { buildCompareHistoryIntentParams } from '../../utils/historyNavigation';
 
 const DEVICE_FRAME_WIDTH = 390;
 
@@ -114,8 +115,11 @@ export const CompareScreenContainer = () => {
 
   const handleViewFullHistory = useCallback(() => {
     applyFullHistoryFilter();
-    router.navigate('/history');
-  }, [applyFullHistoryFilter, router]);
+    router.navigate({
+      pathname: '/history',
+      params: buildCompareHistoryIntentParams(selectedProduct?.id ?? null)
+    });
+  }, [applyFullHistoryFilter, router, selectedProduct?.id]);
 
   const handleSelectRecommendation = useCallback(
     (storeId: string) => {

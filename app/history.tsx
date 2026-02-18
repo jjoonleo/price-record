@@ -1,6 +1,6 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -13,6 +13,11 @@ import { useI18n } from '../src/i18n/useI18n';
 import { colors, spacing, typography } from '../src/theme/tokens';
 import { HistoryEntry, ProductOption, Store } from '../src/types/domain';
 import { formatYen, getDisplayStoreName } from '../src/utils/formatters';
+import {
+  HistoryRouteIntentParams,
+  parseCompareHistoryIntent,
+  resolveValidHistoryProductFilter
+} from '../src/utils/historyNavigation';
 
 const BADGE_COLORS = ['#FACC15', '#3B82F6', '#F97316', '#22C55E', '#A855F7'];
 
@@ -68,6 +73,7 @@ const toTimelineLabel = (isoDate: string, locale: string): string => {
 
 export default function HistoryScreen() {
   const router = useRouter();
+  const routeParams = useLocalSearchParams<HistoryRouteIntentParams>();
   const { language, t } = useI18n();
   const locale = language === 'ko' ? 'ko-KR' : 'en-US';
   const { width } = useWindowDimensions();
@@ -79,14 +85,34 @@ export default function HistoryScreen() {
   const [selectedProductFilterId, setSelectedProductFilterId] = useState<string | null>(null);
   const [selectedStoreFilterId, setSelectedStoreFilterId] = useState<string | null>(null);
   const [isFilterModalVisible, setIsFilterModalVisible] = useState(false);
+  const lastAppliedIntentIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const compareIntent = parseCompareHistoryIntent(
+      routeParams,
+      lastAppliedIntentIdRef.current
+    );
+
+    if (!compareIntent) {
+      return;
+    }
+
+    setSelectedProductFilterId(compareIntent.productFilterId);
+    setSelectedStoreFilterId(null);
+    lastAppliedIntentIdRef.current = compareIntent.intentId;
+  }, [routeParams]);
 
   const refreshOptions = useCallback(async () => {
     const [productRows, storeRows] = await Promise.all([listProductOptions(), listStores()]);
     setProducts(productRows);
     setStores(storeRows);
 
-    if (selectedProductFilterId && !productRows.find((item) => item.id === selectedProductFilterId)) {
-      setSelectedProductFilterId(null);
+    const validProductFilterId = resolveValidHistoryProductFilter(
+      selectedProductFilterId,
+      productRows.map((item) => item.id)
+    );
+    if (validProductFilterId !== selectedProductFilterId) {
+      setSelectedProductFilterId(validProductFilterId);
     }
 
     if (selectedStoreFilterId && !storeRows.find((item) => item.id === selectedStoreFilterId)) {
