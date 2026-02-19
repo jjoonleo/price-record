@@ -116,6 +116,8 @@ export const translations = {
     home_empty_title: "No prices yet",
     home_empty_body: "Capture your first price to start building this list.",
     home_no_results: "No matches found",
+    home_no_price_subtitle: "No price info yet",
+    home_no_price_badge: "No Price",
     home_capture: "Capture",
 
     compare_title: "Where Should You Buy?",
@@ -376,6 +378,8 @@ export const translations = {
     home_empty_title: "아직 기록된 가격이 없어요",
     home_empty_body: "첫 가격을 기록하면 이 목록에 표시됩니다.",
     home_no_results: "검색 결과가 없어요",
+    home_no_price_subtitle: "아직 가격 정보가 없어요",
+    home_no_price_badge: "가격 없음",
     home_capture: "기록",
 
     compare_title: "어디서 구매할까요?",

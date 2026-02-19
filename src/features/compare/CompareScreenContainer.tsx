@@ -79,6 +79,18 @@ export const CompareScreenContainer = () => {
     return subtitle && subtitle.trim().length > 0 ? subtitle : null;
   }, [selectedProduct]);
 
+  const popScreen = useCallback(
+    (fallbackPathname: '/') => {
+      if (router.canGoBack()) {
+        router.back();
+        return;
+      }
+
+      router.replace(fallbackPathname);
+    },
+    [router]
+  );
+
   const goToDetail = useCallback(
     (item: StoreComparison) => {
       if (!selectedProduct) {
@@ -86,7 +98,7 @@ export const CompareScreenContainer = () => {
         return;
       }
 
-      router.navigate({
+      router.push({
         pathname: '/product-price-detail',
         params: buildProductPriceDetailRouteParams(item, {
           id: selectedProduct.id,
@@ -103,7 +115,7 @@ export const CompareScreenContainer = () => {
       return;
     }
 
-    router.navigate({
+    router.push({
       pathname: '/product-form',
       params: {
         mode: 'edit',
@@ -115,7 +127,7 @@ export const CompareScreenContainer = () => {
 
   const handleViewFullHistory = useCallback(() => {
     applyFullHistoryFilter();
-    router.navigate({
+    router.push({
       pathname: '/history',
       params: buildCompareHistoryIntentParams(selectedProduct?.id ?? null)
     });
@@ -168,7 +180,7 @@ export const CompareScreenContainer = () => {
           <CompareHeader
             title={t('compare_header_title')}
             backLabel={t('back')}
-            onBack={() => router.navigate('/capture')}
+            onBack={() => popScreen('/')}
             onAction={openSelectedProductEdit}
             actionLabel={t('compare_edit_product')}
             actionAccessibilityLabel={t('compare_edit_product_a11y')}

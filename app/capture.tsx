@@ -503,7 +503,7 @@ export default function CaptureScreen() {
       payload.returnEntryId = entryId;
     }
 
-    router.navigate({ pathname: '/product-form', params: payload });
+    router.push({ pathname: '/product-form', params: payload });
   };
 
   const openAddProductForm = () => {
@@ -653,7 +653,13 @@ export default function CaptureScreen() {
             <View style={[styles.headerRow, { width: frameWidth }]}> 
               <Pressable
                 accessibilityRole="button"
-                onPress={() => router.navigate('/compare')}
+                onPress={() => {
+                  if (router.canGoBack()) {
+                    router.back();
+                    return;
+                  }
+                  router.replace('/');
+                }}
                 style={({ pressed }) => [styles.headerActionLeft, pressed && styles.pressed]}
               >
                 <MaterialCommunityIcons color={colors.primary} name="chevron-left" size={18} />

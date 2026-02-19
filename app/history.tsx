@@ -162,7 +162,7 @@ export default function HistoryScreen() {
         return;
       }
 
-      router.navigate({
+      router.push({
         pathname: '/product-price-detail',
         params: {
           productId: entry.productId,
@@ -189,7 +189,16 @@ export default function HistoryScreen() {
     <SafeAreaView edges={['top']} style={styles.screen}>
       <View style={styles.header}>
         <View style={[styles.headerRow, { width: frameWidth }]}> 
-          <Pressable onPress={() => router.navigate('/compare')} style={styles.backButton}>
+          <Pressable
+            onPress={() => {
+              if (router.canGoBack()) {
+                router.back();
+                return;
+              }
+              router.replace('/');
+            }}
+            style={styles.backButton}
+          >
             <MaterialCommunityIcons color={colors.primary} name="chevron-left" size={19} />
             <Text style={styles.backText}>{t('back')}</Text>
           </Pressable>

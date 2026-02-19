@@ -16,6 +16,9 @@ describe('createHomeScreenStore', () => {
           createdAt: '2026-02-17T10:05:00.000Z'
         }
       ]),
+      listProductOptions: jest.fn().mockResolvedValue([
+        { id: 'product-1', name: 'Matcha KitKat', entryCount: 1 }
+      ]),
       getProductById: jest.fn().mockResolvedValue({
         id: 'product-1',
         name: 'Matcha KitKat',
@@ -38,6 +41,7 @@ describe('createHomeScreenStore', () => {
   it('surfaces fallback error when hydration fails', async () => {
     const store = createHomeScreenStore({
       listHistoryEntries: jest.fn().mockRejectedValue('bad'),
+      listProductOptions: jest.fn(),
       getProductById: jest.fn()
     });
 
@@ -47,5 +51,33 @@ describe('createHomeScreenStore', () => {
     expect(state.errorMessage).toBe('load failed');
     expect(state.productImageById).toEqual({});
     expect(state.isLoading).toBe(false);
+  });
+
+  it('includes products that have no price entries', async () => {
+    const store = createHomeScreenStore({
+      listHistoryEntries: jest.fn().mockResolvedValue([]),
+      listProductOptions: jest.fn().mockResolvedValue([
+        { id: 'product-no-price', name: 'Tokyo Banana', entryCount: 0 }
+      ]),
+      getProductById: jest.fn().mockResolvedValue({
+        id: 'product-no-price',
+        name: 'Tokyo Banana',
+        normalizedName: 'tokyo banana',
+        note: '',
+        imageUri: '',
+        createdAt: '2026-02-16T00:00:00.000Z'
+      })
+    });
+
+    await store.getState().hydrateHome('load failed');
+
+    const item = store.getState().items[0];
+    expect(item).toMatchObject({
+      productId: 'product-no-price',
+      productName: 'Tokyo Banana',
+      storeName: '',
+      cityArea: '',
+      priceYen: null
+    });
   });
 });

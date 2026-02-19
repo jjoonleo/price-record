@@ -1,13 +1,16 @@
 import renderer, { act } from 'react-test-renderer';
 import { CompareScreenContainer } from '../CompareScreenContainer';
 
-const mockNavigate = jest.fn();
+const mockPush = jest.fn();
 const mockApplyFullHistoryFilter = jest.fn();
 const mockUseCompareScreenController = jest.fn();
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({
-    navigate: mockNavigate
+    push: mockPush,
+    back: jest.fn(),
+    replace: jest.fn(),
+    canGoBack: jest.fn().mockReturnValue(true)
   })
 }));
 
@@ -101,7 +104,7 @@ describe('CompareScreenContainer', () => {
       });
 
       expect(mockApplyFullHistoryFilter).toHaveBeenCalledTimes(1);
-      expect(mockNavigate).toHaveBeenCalledWith({
+      expect(mockPush).toHaveBeenCalledWith({
         pathname: '/history',
         params: {
           source: 'compare',

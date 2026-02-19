@@ -6,7 +6,7 @@ export type HomeListItem = {
   storeId: string;
   storeName: string;
   cityArea: string;
-  priceYen: number;
+  priceYen: number | null;
   observedAt: string;
   createdAt: string;
 };

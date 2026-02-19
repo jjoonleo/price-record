@@ -1,6 +1,6 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { Tabs } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { Tabs, useRouter } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { runMigrations } from '../src/db/migrations';
@@ -10,6 +10,7 @@ import { colors, gradients, radius, spacing, typography } from '../src/theme/tok
 const BOOT_TIMEOUT_MS = 12000;
 
 export default function RootLayout() {
+  const router = useRouter();
   const { t } = useI18n();
   const [isReady, setIsReady] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -32,6 +33,19 @@ export default function RootLayout() {
   useEffect(() => {
     void bootstrap();
   }, []);
+
+  const createTabPressListener = useCallback(
+    (pathname: '/' | '/history' | '/profile') => ({
+      tabPress: (event: { preventDefault: () => void }) => {
+        event.preventDefault();
+        if (router.canGoBack()) {
+          router.dismissAll();
+        }
+        router.replace(pathname);
+      }
+    }),
+    [router]
+  );
 
   if (!isReady && !errorMessage) {
     return (
@@ -78,11 +92,23 @@ export default function RootLayout() {
         }
       })}
     >
-      <Tabs.Screen name="index" options={{ title: t('tabs_home') }} />
+      <Tabs.Screen
+        name="index"
+        listeners={createTabPressListener('/')}
+        options={{ title: t('tabs_home') }}
+      />
       <Tabs.Screen name="capture" options={{ href: null }} />
       <Tabs.Screen name="compare" options={{ href: null }} />
-      <Tabs.Screen name="history" options={{ title: t('tabs_history') }} />
-      <Tabs.Screen name="profile" options={{ title: t('tabs_profile') }} />
+      <Tabs.Screen
+        name="history"
+        listeners={createTabPressListener('/history')}
+        options={{ title: t('tabs_history') }}
+      />
+      <Tabs.Screen
+        name="profile"
+        listeners={createTabPressListener('/profile')}
+        options={{ title: t('tabs_profile') }}
+      />
       <Tabs.Screen name="product-price-detail" options={{ href: null }} />
       <Tabs.Screen name="product-form" options={{ href: null }} />
     </Tabs>

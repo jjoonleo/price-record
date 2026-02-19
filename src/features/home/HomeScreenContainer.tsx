@@ -73,7 +73,7 @@ export const HomeScreenContainer = () => {
     (productId: string) => {
       setSelectedProductId(productId);
       clearHistoryStoreFilter();
-      router.navigate('/compare');
+      router.push('/compare');
     },
     [clearHistoryStoreFilter, router, setSelectedProductId]
   );
@@ -144,6 +144,14 @@ export const HomeScreenContainer = () => {
             <View style={styles.listCard}>
               {filteredItems.map((item, index) => {
                 const imageSource = resolveProductImageSource(productImageById[item.productId]);
+                const hasPriceInfo = item.priceYen !== null;
+                const subtitle = hasPriceInfo
+                  ? `${item.storeName} • ${item.cityArea}`
+                  : t('home_no_price_subtitle');
+                const priceLabel =
+                  item.priceYen === null
+                    ? t('home_no_price_badge')
+                    : toPriceLabel(item.priceYen, locale);
 
                 return (
                   <Pressable
@@ -167,11 +175,11 @@ export const HomeScreenContainer = () => {
                         {item.productName}
                       </Text>
                       <Text numberOfLines={1} style={styles.itemSubtitle}>
-                        {item.storeName} • {item.cityArea}
+                        {subtitle}
                       </Text>
                     </View>
 
-                    <Text style={styles.itemPrice}>{toPriceLabel(item.priceYen, locale)}</Text>
+                    <Text style={styles.itemPrice}>{priceLabel}</Text>
                     <MaterialCommunityIcons color={colors.textDisabled} name="chevron-right" size={16} />
                   </Pressable>
                 );
@@ -184,7 +192,7 @@ export const HomeScreenContainer = () => {
       <Pressable
         accessibilityHint={t('home_capture')}
         accessibilityRole="button"
-        onPress={() => router.navigate('/capture')}
+        onPress={() => router.push('/capture')}
         style={({ pressed }) => [styles.fab, pressed && styles.pressed]}
       >
         <MaterialCommunityIcons color={colors.white} name="plus" size={30} />

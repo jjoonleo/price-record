@@ -102,7 +102,11 @@ export const ProductPriceDetailScreenContainer = () => {
   }, [loadProductImage, parsedParams]);
 
   const handleBack = () => {
-    router.navigate('/compare');
+    if (router.canGoBack()) {
+      router.back();
+      return;
+    }
+    router.replace('/compare');
   };
 
   const handleEdit = () => {
@@ -111,7 +115,7 @@ export const ProductPriceDetailScreenContainer = () => {
       return;
     }
 
-    router.navigate({
+    router.push({
       pathname: '/capture',
       params: {
         mode: 'edit',
@@ -158,7 +162,7 @@ export const ProductPriceDetailScreenContainer = () => {
 
         try {
           await deletePriceEntry(fallbackEntryId);
-          router.navigate('/compare');
+          handleBack();
         } catch (error) {
           setStatusMessage(error instanceof Error ? error.message : t('save_error'));
         }
@@ -176,7 +180,7 @@ export const ProductPriceDetailScreenContainer = () => {
 
     try {
       await deletePriceEntry(parsedParams.priceEntryId);
-      router.navigate('/compare');
+      handleBack();
     } catch (error) {
       setStatusMessage(error instanceof Error ? error.message : t('save_error'));
     }

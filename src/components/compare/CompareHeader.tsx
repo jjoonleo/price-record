@@ -27,7 +27,9 @@ export const CompareHeader = ({
           <Text style={styles.backText}>{backLabel}</Text>
         </Pressable>
 
-        <Text style={styles.headerTitle}>{title}</Text>
+        <Text pointerEvents="none" style={styles.headerTitle}>
+          {title}
+        </Text>
 
         <Pressable
           accessibilityRole="button"
